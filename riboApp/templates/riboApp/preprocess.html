@@ -1,0 +1,31 @@
+{% extends 'riboApp/base.html' %}
+
+{% block title %} Create New List {% endblock %}
+
+{% block content %}
+  <h1>Pre-Processing</h1>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Submit</button>
+  </form>
+
+  {% if all_inputs %}
+    <h2>Past Experiments</h2>
+    {% for input in all_inputs %}
+      <div>
+        <p><strong>Experiment: </strong> {{ input.experimentName }}</p>
+        <p><strong>Adapter sequence: </strong> {{ input.adapter }}</p>
+        <p><strong>GRCm39: </strong> {{ input.mouseGenome|yesno:"Yes,No" }}</p>
+        <p><strong>GRCh38: </strong> {{ input.humanGenome|yesno:"Yes,No" }}</p>
+        <p><strong>File containing sample data paths: </strong>
+        <a href="{% url 'download_file' input.sampleFile.name|slice:"8:" %}">{{ input.sampleFile.name|slice:"8:" }}</a>
+        </p>
+
+        <hr>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+{% endblock %}

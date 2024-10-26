@@ -1,0 +1,53 @@
+{% extends 'riboApp/base.html' %}
+
+{% block content %}
+<h1>RiboApp Home</h1>
+
+<div class="vertical-menu">
+    <a href="/preprocess/" class="menu-item">Pre-Process <br> <span class="arrow">↓ </span><br></a>
+    <a href="/analyze/" class="menu-item">Analyze <br> <span class="arrow">↓ </span><br></a>
+    <a href="/pSiteLocation/" class="menu-item">Locate P Sites </span></a>
+</div>
+
+{% endblock %}
+
+<style>
+    /* Style for the vertical menu */
+    .vertical-menu {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: 20px;
+    }
+
+    .menu-item {
+        display: block;
+        padding: 15px;
+        font-size: 20px;
+        font-weight: bold;
+        text-decoration: none;
+        color: #368BC1;
+        background-color: #f9f9f9;
+        border: 2px solid #368BC1;
+        width: 200px;
+        text-align: center;
+        margin-bottom: 10px;
+        position: relative;
+    }
+
+    .menu-item:hover {
+        background-color: #87AFC7;
+        color: white;
+        border-color: #87AFC7;
+    }
+
+    .arrow {
+        font-size: 16px;
+        margin-left: 10px;
+        color: #368BC1;
+    }
+
+    .menu-item:hover .arrow {
+        color: white;
+    }
+</style>

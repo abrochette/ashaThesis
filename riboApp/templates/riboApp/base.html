@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Ribo App</title>
+  <style>
+    /* top bar */
+    .topBar {
+      background-color: #368BC1;
+      overflow: hidden;
+      display: flex;
+    }
+
+    /* text inside top bar */
+    .topBar a {
+      color: white;
+      padding: 14px 20px;
+      text-align: center;
+      text-decoration: none;
+      display: block;
+    }
+
+    /* change color when hovering */
+    .topBar a:hover {
+      background-color: #87AFC7;
+      color: white;
+    }
+
+    .topBar a.active {
+      background-color: #87AFC7;
+      color: white;
+    }
+
+    #content {
+      padding: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="topBar">
+    <a href="/home" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">Home</a>
+    <a href="/preprocess" class="{% if request.resolver_match.url_name == 'preprocess' %}active{% endif %}">Pre-Processing</a>
+    <a href="/analyze" class="{% if request.resolver_match.url_name == 'analyze' %}active{% endif %}">Analyze</a>
+    <a href="/locatepsites" class="{% if request.resolver_match.url_name == 'pSiteLocation' %}active{% endif %}">Locate P Sites</a>
+  </div>
+
+  <div id="content" name="content">
+    {% block content %}
+    {% endblock %}
+  </div>
+</body>
+
+</html>
