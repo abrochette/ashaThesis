@@ -4,6 +4,32 @@ from .models import ProcessingInput
 from .forms import CreateNewList
 import mimetypes
 import os
+import yaml
+
+def reformatFilepaths(file_content):
+    """
+    Reformats the user-provided file content into YAML-compatible structure.
+    """
+    yaml_data = {
+        "fastq_base": "",
+        "fastq": {}
+    }
+
+    for line in file_content.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            # format: "experiment_name /path/to/file"
+            experiment_name, filepath = line.split(' ', 1)
+        except ValueError:
+            raise ValueError(f"Line '{line}' is not formatted as 'experiment_name /path/to/file'.")
+        if experiment_name not in yaml_data["fastq"]:
+            yaml_data["fastq"][experiment_name] = []
+        yaml_data["fastq"][experiment_name].append(filepath)
+
+    return yaml.dump(yaml_data, default_flow_style=False)
+
 
 def preProcess(response):
     if response.method == "POST":
@@ -11,7 +37,7 @@ def preProcess(response):
         if form.is_valid():
             experimentName = form.cleaned_data["experimentName"]
             adapter = form.cleaned_data["adapter"]
-            sampleFile = form.cleaned_data["sampleFile"]
+            sampleFile = response.FILES["sampleFile"]
             humanGenome = form.cleaned_data["humanGenome"]
             mouseGenome = form.cleaned_data["mouseGenome"]
 
@@ -34,68 +60,52 @@ def preProcess(response):
                     if len(parts) == 2:
                         sample_data.append((parts[0], parts[1]))  # (name, filepath)
 
-            # Determine the genome based on the user selection
-            genome = ""
+            # Determine the genome based on the user selectionb
             if mouseGenome:
-                genome = "/blue/kotaro.fujii/a.rochette/GRCm39.genome.fa"
-            elif humanGenome:
-                genome = "/blue/kotaro.fujii/a.rochette/GRCh38.genome.fa"
+                genome = "curl -L --output mus-musculus.tar.gz https://github.com/RiboBase/reference_mus-musculus/archive/refs/tags/v1.0.tar.gz"
+                filter = "reference_mus-musculus-1.0/filter/mouse/mouse_rtRNA*"
+                transcriptome = "reference_mus-musculus-1.0/transcriptome/mouse/appris_mouse_v2_selected*"
+                regions = "appris_mouse_v2_actual_regions.bed"
+                transcriptLengths = "appris_mouse_v2_transcript_lengths.tsv"
+            else:
+                genome = "curl -L --output homo-sapiens.tar.gz https://github.com/RiboBase/reference_homo-sapiens/archive/refs/tags/v1.0.tar.gz"
+                filter = "reference_homo-sapiens-1.0/filter/human/human_rtRNA*"
+                transcriptome = "reference_homo-sapiens-1.0/transcriptome/human/appris_human_v2_selected*"
+                regions = "appris_human_v2_actual_regions.bed"
+                transcriptLengths = "appris_human_v2_transcript_lengths.tsv"
 
-            # Construct the shell script dynamically based on user input and sample file content
-            script_content = f"""#!/bin/bash
-#SBATCH --job-name=nextflow_processing    # Job name
-#SBATCH --output=/blue/kotaro.fujii/a.rochette/nextflow_processed_riboseq/logs/output_%A_%a.out        # Standard output (%A=job ID, %a=array index)
-#SBATCH --error=/blue/kotaro.fujii/a.rochette/nextflow_processed_riboseq/logs/error_%A_%a.err          # Standard error (%A=job ID, %a=array index)
-#SBATCH --time=24:00:00                   # Time limit hrs:min:sec (adjust based on expected runtime)
-#SBATCH --cpus-per-task=1                # Number of CPU cores per task (adjust if needed)
-#SBATCH --mem-per-cpu=30gb               # Job memory request (adjust if needed)
-#SBATCH --mail-type=END,FAIL             # Mail events (NONE, BEGIN, END, FAIL, ALL)
-#SBATCH --mail-user=a.rochette@ufl.edu   # Where to send mail
-#SBATCH --ntasks=1                       # Run on a single CPU
-#SBATCH --qos=kotaro.fujii-b
+            OGfilePaths = sampleFile.read().decode("utf-8")
+            filePaths = reformatFilepaths(OGfilePaths)
 
-module purge
-module load java
-module load nextflow/24.04.2
-module load singularity/3.10.4
-module load conda
+            myScriptPath = os.path.join(os.path.dirname(__file__), 'scripts', 'outputScript.sh')
+            if not os.path.exists(myScriptPath):
+                raise Http404(f"Script file not found at {myScriptPath}")
+            with open(myScriptPath, 'r') as template_file:
+                scriptContent = template_file.read()
 
+            scriptContent = scriptContent.replace("{filter}", filter)
+            scriptContent = scriptContent.replace("{genome}", genome)
+            scriptContent = scriptContent.replace("{transcriptome}", transcriptome)
+            scriptContent = scriptContent.replace("{regions}", regions)
+            scriptContent = scriptContent.replace("{transcriptLengths}", transcriptLengths)
+            scriptContent = scriptContent.replace("{experimentName}", experimentName)
+            scriptContent = scriptContent.replace("{filePaths}", filePaths)
 
-# Define directories and input files
-OUTPUT_DIR="/blue/kotaro.fujii/a.rochette/nextflow_processed_riboseq"
-SAMPLESHEET="$OUTPUT_DIR/samplesheet.csv"  # The generated CSV file path
-FASTA="{genome}"                 # Path to the selected genome file
-GTF="/blue/kotaro.fujii/a.rochette/gencode.vM34.chr_patch_hapl_scaff.annotation.gtf"
-CONTAMINANTS_FASTA="/blue/kotaro.fujii/a.rochette/rdna_mouse-48s.fasta"
-LOG_DIR="${{OUTPUT_DIR}}/logs"
-mkdir -p "$LOG_DIR"
+            output_dir = os.path.join('media', 'generated_scripts')
+            os.makedirs(output_dir, exist_ok=True)
 
-# Install RiboFlow dependencies
-git clone https://github.com/ribosomeprofiling/riboflow.git
-conda env create -f riboflow/environment.yaml
+            clean_experiment_name = experimentName.replace(" ", "")
+            script_file_path = os.path.join(output_dir, f"{clean_experiment_name}Script.sh")
 
-# Activate the ribo environment
-conda activate ribo
+            with open(script_file_path, 'w') as output_file:
+                output_file.write(scriptContent)
 
-# Get RiboFlow repository
-mkdir rf_test_run && cd rf_test_run
-git clone https://github.com/ribosomeprofiling/riboflow.git
-cd riboflow
+            script_file_url = f"generated_scripts/{clean_experiment_name}Script.sh"
 
-# Write user data into project.yaml file in riboflow directory
-
-
-# Finally run RiboFlow
-nextflow RiboFlow.groovy -params-file project.yaml
-"""
-
-            # Add user-specific experiment information
-            script_content += f"# Further commands to process {experimentName} can go here...\n"
-
-            # Return the generated script as a downloadable file
-            response = HttpResponse(script_content, content_type='application/x-sh')
-            response['Content-Disposition'] = f'attachment; filename="{experimentName}_script.sh"'
-            return response
+            return render(response, "riboApp/preprocess.html", {
+                "form": form,
+                "script_file": script_file_url
+            })
     else:
         form = CreateNewList()
 
@@ -104,10 +114,7 @@ nextflow RiboFlow.groovy -params-file project.yaml
 
 
     all_inputs = ProcessingInput.objects.all()
-
     return render(response, "riboApp/preprocess.html", {"form": form, "all_inputs": all_inputs})
-
-
 # def preProcess(response):
 #     if response.method == "POST":
 #         form = CreateNewList(response.POST, response.FILES)

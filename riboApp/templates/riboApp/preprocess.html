@@ -11,6 +11,15 @@
     <button type="submit">Submit</button>
   </form>
 
+  {% if script_file %}
+    <div>
+      <p>Click here to Download:</p>
+      <a href="/media/{{ script_file }}" download>
+        <button type="button">Download Script</button>
+      </a>
+    </div>
+  {% endif %}
+
   {% if all_inputs %}
     <h2>Past Experiments</h2>
     {% for input in all_inputs %}
@@ -22,7 +31,6 @@
         <p><strong>File containing sample data paths: </strong>
         <a href="{% url 'download_file' input.sampleFile.name|slice:"8:" %}">{{ input.sampleFile.name|slice:"8:" }}</a>
         </p>
-
         <hr>
       </div>
     {% endfor %}
