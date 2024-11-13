@@ -22,6 +22,7 @@ class ProcessingInput(models.Model):
     experimentName = models.CharField(max_length=200)
     adapter = models.CharField(max_length=500)
     mouseGenome = models.BooleanField()
+    #TODO get rid of hunan line just look if mouse is true or false
     humanGenome = models.BooleanField()
     sampleFile = models.FileField(upload_to='uploads/')
 

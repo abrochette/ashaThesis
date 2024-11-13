@@ -15,6 +15,14 @@ def preProcess(response):
             humanGenome = form.cleaned_data["humanGenome"]
             mouseGenome = form.cleaned_data["mouseGenome"]
 
+            ProcessingInput.objects.create(
+                experimentName=experimentName,
+                adapter=adapter,
+                sampleFile=sampleFile,
+                humanGenome=humanGenome,
+                mouseGenome=mouseGenome
+            )
+
             # Read the contents of the uploaded sample file
             sample_file_content = sampleFile.read().decode('utf-8')
 
@@ -90,6 +98,10 @@ nextflow RiboFlow.groovy -params-file project.yaml
             return response
     else:
         form = CreateNewList()
+
+    # to delete at specified index
+    # ProcessingInput.objects.filter(id="4").delete()
+
 
     all_inputs = ProcessingInput.objects.all()
 
