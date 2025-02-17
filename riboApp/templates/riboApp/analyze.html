@@ -1,10 +1,16 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends 'riboApp/base.html' %}
+
+{% load plotly_dash %}
+
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Title</title>
+    <title>Two-Parquet Scatter</title>
 </head>
 <body>
+    <h1>My Django Page with Two-Parquet Gene Scatter</h1>
+
+    <!-- This tag inserts the Dash app content -->
+    {% plotly_app name="TwoParquetGeneScatter" %}
 
 </body>
 </html>

@@ -3,6 +3,8 @@ from . import views
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
+import riboApp.geneCounts
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -10,7 +12,9 @@ urlpatterns = [
     path("preprocess/", views.preProcess, name="preprocess"),
     path("analyze/", views.analyze, name="analyze"),
     path("locatepsites/", views.locatePsites, name="locatepsites"),
-    path('download/<str:file_name>/', views.download_file, name='download_file')
+    path('download/<str:file_name>/', views.download_file, name='download_file'),
+    path("upload/", views.upload_parquet, name="upload_parquet"),
+    path("geneCounts/", views.geneCounts, name="geneCounts"),
 ]
 
 if settings.DEBUG:

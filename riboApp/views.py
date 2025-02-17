@@ -1,10 +1,28 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from .models import ProcessingInput
 from .forms import CreateNewList
 import mimetypes
-import os
 import yaml
+import os
+import pandas as pd
+from .forms import ParquetUploadForm
+from .models import ParquetData
+from django.contrib import messages
+from django.db import models
+import pyarrow.parquet as pq
+import dash
+from dash import dcc, html
+from .models import SelectedGene
+import riboApp.geneCounts
+from django_plotly_dash import DjangoDash
+from django.shortcuts import render
+from django.http import JsonResponse
+import plotly.express as px
+import pandas as pd
+import os
+import pyarrow.parquet as pq
+
 
 def reformatFilepaths(file_content):
     """
@@ -137,3 +155,115 @@ def analyze(response):
 
 def locatePsites(response):
     return render(response, 'riboApp/psites.html')
+
+
+def get_gene_reads(gene_name):
+    parquet_folder = "media/parquetFiles/"  # Adjust as needed
+    files = os.listdir(parquet_folder)
+
+    all_data = []
+
+    for file in files:
+        file_path = os.path.join(parquet_folder, file)
+
+        # Load only relevant columns
+        df = pq.read_table(file_path, columns=["gene_name", "read_count"]).to_pandas()
+
+        # Filter for the requested gene
+        filtered_df = df[df["gene_name"] == gene_name]
+        all_data.append(filtered_df)
+
+    return pd.concat(all_data, ignore_index=True)
+# Upload and store all Parquet data
+def upload_parquet(request):
+    if request.method == "POST":
+        form = ParquetUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            uploaded_file = form.save()  # Saves file path in DB
+
+            file_path = uploaded_file.file.path  # Full file path
+
+            # Check if the file is valid
+            try:
+                df = pq.read_table(file_path).to_pandas()  # Load with PyArrow for speed
+
+                # Ensure required columns exist
+                required_columns = {"transcript_id", "gene_name", "start_position", "end_position",
+                                    "strand", "read_id", "read_length", "read_count", "region", "source_file"}
+
+                missing_columns = required_columns - set(df.columns)
+                if missing_columns:
+                    messages.error(request, f"Skipping missing columns: {', '.join(missing_columns)}")
+                    return redirect("upload_parquet")
+
+            except Exception as e:
+                messages.error(request, f"Invalid Parquet file: {str(e)}")
+                return redirect("upload_parquet")
+
+            messages.success(request, f"File uploaded successfully: {uploaded_file.file.name}")
+            return redirect("upload_parquet")
+
+    else:
+        form = ParquetUploadForm()
+
+    return render(request, "riboApp/uploadParquet.html", {"form": form})
+
+from django.shortcuts import render
+from .models import SelectedGene
+
+def geneCounts(request):
+    import riboApp.geneCounts  # ✅ Ensure Dash app runs
+    selected_genes = SelectedGene.objects.all()
+    return render(request, "riboApp/geneCounts.html", {"selected_genes": selected_genes})
+
+def get_gene_counts():
+    """
+    Reads uploaded Parquet files and extracts gene count data.
+    Returns a Pandas DataFrame.
+    """
+    parquet_folder = "media/parquetFiles/"  # Adjust as needed
+    files = os.listdir(parquet_folder)
+
+    all_data = []
+
+    for file in files:
+        file_path = os.path.join(parquet_folder, file)
+
+        # Read only relevant columns
+        df = pq.read_table(file_path, columns=["gene_name", "read_count"]).to_pandas()
+        all_data.append(df)
+
+    df_merged = pd.concat(all_data, ignore_index=True)
+
+    return df_merged
+
+
+def plot_gene_counts(request):
+    """
+    Generates a Plotly scatter plot for genes and returns JSON data.
+    """
+    df = get_gene_counts()
+
+    # Check if there are at least two distinct samples
+    if len(df["gene_name"].unique()) < 2:
+        return JsonResponse({"error": "Not enough data to generate a scatter plot."})
+
+    fig = px.scatter(
+        df,
+        x="read_count",
+        y="read_count",
+        hover_name="gene_name",
+        title="Gene Read Counts",
+    )
+
+    # Convert figure to JSON
+    fig_json = fig.to_json()
+
+    return JsonResponse(fig_json, safe=False)
+
+
+def geneCounts(request):
+    """
+    Renders the gene counts page.
+    """
+    return render(request, "riboApp/geneCounts.html")

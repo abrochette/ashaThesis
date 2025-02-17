@@ -1,0 +1,27 @@
+{% extends 'riboApp/base.html' %}
+{% load plotly_dash %}
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gene Scatter Plot</title>
+</head>
+<body>
+
+    <h1>Interactive Gene Scatter Plot</h1>
+
+    <!-- Embed the Dash scatter plot -->
+
+    <div class="{%plotly_class name='geneCounts' %} card"></div>
+    {% plotly_app name="geneCounts" %}
+
+    <h2>Selected Genes</h2>
+    <ul>
+        {% for gene in selected_genes %}
+            <li>{{ gene.gene_name }}</li>
+        {% endfor %}
+    </ul>
+
+</body>
+</html>
