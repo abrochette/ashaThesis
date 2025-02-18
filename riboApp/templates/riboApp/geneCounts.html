@@ -53,6 +53,21 @@
         {% endfor %}
     </ul>
 </div>
+
+<div id="bin-count-links" style="margin-top: 20px;">
+    <h3>View Bin Counts for Selected Files</h3>
+    {% if file1 %}
+        <a href="{% url 'binCounts' %}?selected_file={{ file1 }}" class="btn btn-primary" style="margin-right: 10px;">
+            Bin Counts for {{ file1 }}
+        </a>
+    {% endif %}
+    {% if file2 %}
+        <a href="{% url 'binCounts' %}?selected_file={{ file2 }}" class="btn btn-primary">
+            Bin Counts for {{ file2 }}
+        </a>
+    {% endif %}
+</div>
+
 {% endif %}  {# End conditional block #}
 
 <script>

@@ -19,7 +19,7 @@ urlpatterns = [
     path("save_selected_genes/", views.save_selected_genes, name="save_selected_genes"),
     path("binCounts/", views.bin_counts_view, name="binCounts"),
     path("pca/", views.pca_gene_counts, name="pca_plot"),
-    path("coverageGraphs/", views.metagene_analysis, name="coverageGraphs"),
+    path("coverageGraphs/", views.process_ribo_files, name="coverageGraphs"),
 ]
 
 if settings.DEBUG:
