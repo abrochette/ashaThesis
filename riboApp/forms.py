@@ -15,3 +15,5 @@ class ParquetUploadForm(forms.ModelForm):
     class Meta:
         model = UploadedParquet
         fields = ["file"]
+
+

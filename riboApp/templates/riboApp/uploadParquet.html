@@ -1,9 +1,9 @@
 {% extends 'riboApp/base.html' %}
+{% load crispy_forms_tags %}
 
 {% block content %}
     <h2>Upload Parquet File</h2>
 
-    <!-- Display Success/Failure Messages -->
     {% if messages %}
         {% for message in messages %}
             <p style="color: {% if message.tags == 'success' %}green{% else %}red{% endif %};">
@@ -12,40 +12,33 @@
         {% endfor %}
     {% endif %}
 
-    <!-- Upload Form -->
-    <form method="post" enctype="multipart/form-data">
+    <form method="post" enctype="multipart/form-data" class="form-group">
         {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">Upload</button>
+        {{ form|crispy }}  <!-- Use Crispy Forms -->
+        <button type="submit" class="btn btn-primary">Upload</button>
     </form>
 
     <hr>
 
-    <!-- Navigation Buttons -->
     <h3>Analysis Options</h3>
     <p>Select an analysis type to proceed:</p>
 
     <div style="display: flex; flex-wrap: wrap; gap: 10px;">
         <a href="{% url 'geneCounts' %}">
-            <button style="padding: 10px; background-color: #0099c6; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            <button style="padding: 10px; background-color: #368BC1; color: white; border: none; border-radius: 5px; cursor: pointer;">
                 Gene Counts
             </button>
         </a>
 
         <a href="{% url 'binCounts' %}">
-            <button style="padding: 10px; background-color: #17becf; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            <button style="padding: 10px; background-color: #0099c6; color: white; border: none; border-radius: 5px; cursor: pointer;">
                 Bin Counts
             </button>
         </a>
 
         <a href="{% url 'pca_plot' %}">
-            <button style="padding: 10px; background-color: #19d3f3; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            <button style="padding: 10px; background-color: #87AFC7; color: white; border: none; border-radius: 5px; cursor: pointer;">
                 PCA Analysis
-            </button>
-
-        <a href="{% url 'coverageGraphs' %}">
-            <button style="padding: 10px; background-color: #00b5f7; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                Coverage
             </button>
         </a>
 
