@@ -7,15 +7,16 @@
 
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Submit</button>
+    {% load crispy_forms_tags %}
+    {{ form|crispy }}
+    <button type="submit" class="btn btn-primary">Submit</button>
   </form>
 
   {% if script_file %}
     <div>
       <p>Click here to Download:</p>
       <a href="/media/{{ script_file }}" download>
-        <button type="button">Download Script</button>
+        <button type="button" class="btn btn-success">Download Script</button>
       </a>
     </div>
   {% endif %}

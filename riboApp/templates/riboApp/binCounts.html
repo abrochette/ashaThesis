@@ -1,0 +1,29 @@
+{% extends 'riboApp/base.html' %}
+
+{% block content %}
+    <h1>Gene Bin Counts</h1>
+
+    <form method="POST">
+        {% csrf_token %}
+        <label for="selected_file">Select a Parquet File:</label>
+        <select name="selected_file" id="selected_file">
+            <option value="">-- Select a file --</option>
+            {% for file in parquet_files %}
+                <option value="{{ file }}" {% if file == selected_file %}selected{% endif %}>
+                    {{ file }}
+                </option>
+            {% endfor %}
+        </select>
+        <button type="submit">Generate Bin Counts</button>
+    </form>
+
+    {% if error_message %}
+        <p style="color: red;">{{ error_message }}</p>
+    {% endif %}
+
+    <div id="plots">
+        {% if plots %}
+            {{ plots|safe }}
+        {% endif %}
+    </div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends 'riboApp/base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+    <h2>Upload Parquet File</h2>
+
+    {% if messages %}
+        {% for message in messages %}
+            <p style="color: {% if message.tags == 'success' %}green{% else %}red{% endif %};">
+                {{ message }}
+            </p>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" class="form-group">
+        {% csrf_token %}
+        {{ form|crispy }}  <!-- Use Crispy Forms -->
+        <button type="submit" class="btn btn-primary">Upload</button>
+    </form>
+
+    <hr>
+
+    <h3>Analysis Options</h3>
+    <p>Select an analysis type to proceed:</p>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+        <a href="{% url 'geneCounts' %}">
+            <button style="padding: 10px; background-color: #368BC1; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                Gene Counts
+            </button>
+        </a>
+
+        <a href="{% url 'binCounts' %}">
+            <button style="padding: 10px; background-color: #0099c6; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                Bin Counts
+            </button>
+        </a>
+
+        <a href="{% url 'pca_plot' %}">
+            <button style="padding: 10px; background-color: #87AFC7; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                PCA Analysis
+            </button>
+        </a>
+
+    </div>
+
+{% endblock %}

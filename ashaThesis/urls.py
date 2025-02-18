@@ -21,4 +21,5 @@ from django.urls import path, include
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("riboApp.urls")),
+    path('TwoParquetGeneScatter/', include('django_plotly_dash.urls')),
 ]

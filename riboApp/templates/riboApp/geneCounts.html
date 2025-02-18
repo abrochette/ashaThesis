@@ -1,0 +1,149 @@
+{% extends 'riboApp/base.html' %}
+
+{% block content %}
+
+<h1>Gene Scatter Plot</h1>
+
+<form method="POST">
+    {% csrf_token %}
+
+    <label for="file1">Select File for X-Axis:</label>
+    <select name="file1" id="file1">
+        <option value="">-- Select a file --</option>
+        {% for file in parquet_files %}
+            <option value="{{ file }}">{{ file }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="file2">Select File for Y-Axis:</label>
+    <select name="file2" id="file2">
+        <option value="">-- Select a file --</option>
+        {% for file in parquet_files %}
+            <option value="{{ file }}">{{ file }}</option>
+        {% endfor %}
+    </select>
+
+    <button type="submit">Generate Plot</button>
+</form>
+
+<div id="plot-container">
+    {% if plot_div %}
+        <div>{{ plot_div|safe }}</div>  <!-- Render Plotly figure -->
+    {% else %}
+        <p>No plot generated yet.</p>
+    {% endif %}
+</div>
+
+{% if plot_div %}  {# Only show this section if a plot is generated #}
+<div id="clicked-genes-section">
+    <h3>Clicked Genes</h3>
+    <textarea id="clicked-genes" style="width:100%; height:100px;" readonly></textarea>
+    <button id="save-button">Save Selected Genes</button>
+    <button id="clear-button" style="margin-left: 10px; background-color: red; color: white; border: none; padding: 5px 10px; cursor: pointer;">
+        Clear Selection
+    </button>
+    <div id="save-status" style="color: green; margin-top: 10px;"></div>
+
+    <h3>Selected Genes:</h3>
+    <ul id="selected-genes-list">
+        {% for gene in selected_genes %}
+            <li>{{ gene.gene_name }}</li>
+        {% empty %}
+            <li>No genes selected.</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div id="bin-count-links" style="margin-top: 20px;">
+    <h3>View Bin Counts for Selected Files</h3>
+    {% if file1 %}
+        <a href="{% url 'binCounts' %}?selected_file={{ file1 }}" class="btn btn-primary" style="margin-right: 10px;">
+            Bin Counts for {{ file1 }}
+        </a>
+    {% endif %}
+    {% if file2 %}
+        <a href="{% url 'binCounts' %}?selected_file={{ file2 }}" class="btn btn-primary">
+            Bin Counts for {{ file2 }}
+        </a>
+    {% endif %}
+</div>
+{% endif %}  {# End conditional block #}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    let selectedGenes = [];
+
+    function attachClickListener() {
+        let plotElement = document.querySelector(".js-plotly-plot");
+
+        if (plotElement) {
+            console.log("✅ Plotly graph found. Listening for clicks...");
+
+            plotElement.on("plotly_click", function (data) {
+                console.log("✅ Click event detected:", data);
+
+                if (data && data.points.length > 0) {
+                    const geneName = data.points[0].hovertext;
+
+                    if (geneName && !selectedGenes.includes(geneName)) {
+                        selectedGenes.push(geneName);
+                        document.getElementById("clicked-genes").value = selectedGenes.join("\n");
+                        updateGeneList();
+                        console.log("✅ Clicked gene:", geneName);
+                    }
+                }
+            });
+        } else {
+            console.error("❌ Plotly graph element not found! Retrying in 1 second...");
+            setTimeout(attachClickListener, 1000);
+        }
+    }
+
+    attachClickListener();
+
+    // ✅ Send selected genes to Django when "Save" is clicked
+    document.getElementById("save-button")?.addEventListener("click", function () {
+        console.log("✅ Sending genes to Django:", selectedGenes);
+
+        fetch("/save_selected_genes/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}"
+            },
+            body: JSON.stringify({ "genes": selectedGenes })
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById("save-status").innerText = data.message;
+            console.log("✅ Django Response:", data);
+        })
+        .catch(error => console.error("❌ Error saving genes:", error));
+    });
+
+    // ✅ Clear Selected Genes when "Clear Selection" is clicked
+    document.getElementById("clear-button")?.addEventListener("click", function () {
+        selectedGenes = [];
+        document.getElementById("clicked-genes").value = "";
+        document.getElementById("save-status").innerText = "Selection cleared.";
+        updateGeneList();
+        console.log("✅ Cleared selected genes.");
+    });
+
+    function updateGeneList() {
+        let listElement = document.getElementById("selected-genes-list");
+        listElement.innerHTML = "";
+        if (selectedGenes.length === 0) {
+            listElement.innerHTML = "<li>No genes selected.</li>";
+        } else {
+            selectedGenes.forEach(gene => {
+                let li = document.createElement("li");
+                li.textContent = gene;
+                listElement.appendChild(li);
+            });
+        }
+    }
+});
+</script>
+
+{% endblock %}
