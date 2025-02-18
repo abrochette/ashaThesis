@@ -1,0 +1,47 @@
+{% extends 'riboApp/base.html' %}
+
+{% block content %}
+<h2>Analyze Ribo Files</h2>
+
+<form id="ribo-form">
+    <label for="ribo_file">Select a Ribo File:</label>
+    <select name="ribo_file" id="ribo_file">
+        <option value="">-- Select a file --</option>
+        {% for file in ribo_files %}
+            <option value="{{ file }}">{{ file }}</option>
+        {% endfor %}
+    </select>
+
+    <button type="button" id="analyze-button">Generate Plots</button>
+</form>
+
+<div id="plot-container" style="display: none;">
+    <h3>Start Codon Coverage</h3>
+    <img id="start-plot" src="/media/plots/start_codon_coverage.png" style="max-width: 100%;">
+
+    <h3>Stop Codon Coverage</h3>
+    <img id="stop-plot" src="/media/plots/stop_codon_coverage.png" style="max-width: 100%;">
+</div>
+
+<script>
+document.getElementById("analyze-button").addEventListener("click", function () {
+    let riboFile = document.getElementById("ribo_file").value;
+
+    if (!riboFile) {
+        alert("Please select a ribo file.");
+        return;
+    }
+
+    fetch(`/analyze_ribo/?ribo_file=${riboFile}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log(data.message);
+            document.getElementById("plot-container").style.display = "block";
+            document.getElementById("start-plot").src = "/media/plots/start_codon_coverage.png?" + new Date().getTime();
+            document.getElementById("stop-plot").src = "/media/plots/stop_codon_coverage.png?" + new Date().getTime();
+        })
+        .catch(error => console.error("Error generating plots:", error));
+});
+</script>
+
+{% endblock %}

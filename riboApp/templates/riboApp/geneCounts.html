@@ -34,19 +34,26 @@
     {% endif %}
 </div>
 
-<h3>Clicked Genes</h3>
-<textarea id="clicked-genes" style="width:100%; height:100px;" readonly></textarea>
-<button id="save-button">Save Selected Genes</button>
-<div id="save-status" style="color: green; margin-top: 10px;"></div>
+{% if plot_div %}  {# Only show this section if a plot is generated #}
+<div id="clicked-genes-section">
+    <h3>Clicked Genes</h3>
+    <textarea id="clicked-genes" style="width:100%; height:100px;" readonly></textarea>
+    <button id="save-button">Save Selected Genes</button>
+    <button id="clear-button" style="margin-left: 10px; background-color: red; color: white; border: none; padding: 5px 10px; cursor: pointer;">
+        Clear Selection
+    </button>
+    <div id="save-status" style="color: green; margin-top: 10px;"></div>
 
-<h3>Selected Genes:</h3>
-<ul>
-    {% for gene in selected_genes %}
-        <li>{{ gene.gene_name }}</li>
-    {% empty %}
-        <li>No genes selected.</li>
-    {% endfor %}
-</ul>
+    <h3>Selected Genes:</h3>
+    <ul id="selected-genes-list">
+        {% for gene in selected_genes %}
+            <li>{{ gene.gene_name }}</li>
+        {% empty %}
+            <li>No genes selected.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}  {# End conditional block #}
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
@@ -59,7 +66,7 @@ document.addEventListener("DOMContentLoaded", function () {
             console.log("✅ Plotly graph found. Listening for clicks...");
 
             plotElement.on("plotly_click", function (data) {
-                console.log("✅ Click event detected:", data);  // Debugging output
+                console.log("✅ Click event detected:", data);
 
                 if (data && data.points.length > 0) {
                     const geneName = data.points[0].hovertext;
@@ -67,20 +74,21 @@ document.addEventListener("DOMContentLoaded", function () {
                     if (geneName && !selectedGenes.includes(geneName)) {
                         selectedGenes.push(geneName);
                         document.getElementById("clicked-genes").value = selectedGenes.join("\n");
+                        updateGeneList();
                         console.log("✅ Clicked gene:", geneName);
                     }
                 }
             });
         } else {
             console.error("❌ Plotly graph element not found! Retrying in 1 second...");
-            setTimeout(attachClickListener, 1000);  // Retry in 1 second if graph not yet loaded
+            setTimeout(attachClickListener, 1000);
         }
     }
 
     attachClickListener();
 
     // ✅ Send selected genes to Django when "Save" is clicked
-    document.getElementById("save-button").addEventListener("click", function () {
+    document.getElementById("save-button")?.addEventListener("click", function () {
         console.log("✅ Sending genes to Django:", selectedGenes);
 
         fetch("/save_selected_genes/", {
@@ -98,6 +106,30 @@ document.addEventListener("DOMContentLoaded", function () {
         })
         .catch(error => console.error("❌ Error saving genes:", error));
     });
+
+    // ✅ Clear Selected Genes when "Clear Selection" is clicked
+    document.getElementById("clear-button")?.addEventListener("click", function () {
+        selectedGenes = [];
+        document.getElementById("clicked-genes").value = "";
+        document.getElementById("save-status").innerText = "Selection cleared.";
+        updateGeneList();
+        console.log("✅ Cleared selected genes.");
+    });
+
+    function updateGeneList() {
+        let listElement = document.getElementById("selected-genes-list");
+        listElement.innerHTML = "";
+        if (selectedGenes.length === 0) {
+            listElement.innerHTML = "<li>No genes selected.</li>";
+        } else {
+            selectedGenes.forEach(gene => {
+                let li = document.createElement("li");
+                li.textContent = gene;
+                listElement.appendChild(li);
+            });
+        }
+    }
 });
 </script>
+
 {% endblock %}

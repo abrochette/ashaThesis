@@ -15,7 +15,7 @@ def get_available_parquet_files():
 
 def get_gene_counts(file1, file2):
     """
-    Reads two selected Parquet files in chunks, merges data on `gene_name`,
+    Reads two selected Parquet files in chunks, merges data on gene_name,
     and returns a **memory-efficient** Pandas DataFrame.
     """
     parquet_folder = "media/parquetFiles/"

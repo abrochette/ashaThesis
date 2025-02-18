@@ -41,7 +41,7 @@
   <div class="topBar">
     <a href="/home" class="{% if request.resolver_match.url_name == 'home' %}active{% endif %}">Home</a>
     <a href="/preprocess" class="{% if request.resolver_match.url_name == 'preprocess' %}active{% endif %}">Pre-Processing</a>
-    <a href="/analyze" class="{% if request.resolver_match.url_name == 'analyze' %}active{% endif %}">Analyze</a>
+    <a href="/upload" class="{% if request.resolver_match.url_name == 'upload_parquet' %}active{% endif %}">Analyze</a>
     <a href="/locatepsites" class="{% if request.resolver_match.url_name == 'pSiteLocation' %}active{% endif %}">Locate P Sites</a>
   </div>
 

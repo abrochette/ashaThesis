@@ -4,24 +4,18 @@ from .models import ProcessingInput
 from .forms import CreateNewList
 import mimetypes
 import yaml
-import os
-import pandas as pd
 from .forms import ParquetUploadForm
-from .models import ParquetData
 from django.contrib import messages
-from django.db import models
-import pyarrow.parquet as pq
-import dash
-from dash import dcc, html
-from .models import SelectedGene
-import riboApp.geneCounts
-from django_plotly_dash import DjangoDash
-from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+import json
+import numpy as np
+from django.shortcuts import render, redirect
 from django.http import JsonResponse
 import plotly.express as px
 import pandas as pd
 import os
 import pyarrow.parquet as pq
+from .models import SelectedGene
 
 
 def reformatFilepaths(file_content):
@@ -156,6 +150,9 @@ def analyze(response):
 def locatePsites(response):
     return render(response, 'riboApp/psites.html')
 
+import pyarrow.parquet as pq
+import os
+import pandas as pd
 
 def get_gene_reads(gene_name):
     parquet_folder = "media/parquetFiles/"  # Adjust as needed
@@ -384,3 +381,398 @@ def plot_gene_counts(request):
     print("✅ Plot Generated Successfully")  # ✅ Debugging
 
     return JsonResponse(fig.to_json(), safe=False)
+
+
+from django.shortcuts import render, redirect
+
+import pyarrow.parquet as pq
+from .models import SelectedGene
+
+# Function to list available Parquet files
+def get_available_parquet_files():
+    parquet_folder = "media/parquetFiles/"
+    files = [f for f in os.listdir(parquet_folder) if f.endswith(".parquet")]
+    print(f"Available Parquet Files: {files}")  # Debugging
+    return files
+
+# Function to read and merge selected Parquet files
+import os
+import pyarrow.parquet as pq
+import pandas as pd
+
+import os
+import pyarrow.parquet as pq
+import pandas as pd
+
+
+
+
+def load_selected_genes():
+    """Loads selected genes from the Django database."""
+    selected_genes = SelectedGene.objects.values_list('gene_name', flat=True)
+    return set(selected_genes)
+
+
+# File Paths (Adjust as Needed)
+PARQUET_FOLDER = "media/parquetFiles/"
+OFFSET_CSV = "media/uorf_psite_offset.csv"
+NBINS = 4
+SKIP_5PRIME = 45
+SKIP_3PRIME = 15
+
+
+def get_available_parquet_files():
+    """List all available Parquet files in the storage folder."""
+    return [f for f in os.listdir(PARQUET_FOLDER) if f.endswith(".parquet")]
+
+
+def get_bin_counts(selected_file):
+    """Generates bar plots for selected genes from the selected Parquet file."""
+    selected_genes = load_selected_genes()
+    if not selected_genes:
+        return None, "No selected genes found!"
+
+    file_basename = os.path.splitext(selected_file)[0]
+
+    # Load the P-site offsets
+    offsets_df = pd.read_csv(OFFSET_CSV)
+    offsets_df = offsets_df[offsets_df["Experiment"] == file_basename]
+
+    if offsets_df.empty:
+        return None, f"No P-site offsets found for {file_basename}!"
+
+    length_to_offset = dict(zip(offsets_df["Read Length"], offsets_df["P-site Offset"]))
+
+    # Load selected Parquet file
+    file_path = os.path.join(PARQUET_FOLDER, selected_file)
+    df = pd.read_parquet(file_path)
+    df = df[df["gene_name"].isin(selected_genes)]
+    if df.empty:
+        return None, f"No data found for selected genes in {selected_file}!"
+
+    # Apply offsets
+    df["offset"] = df["read_length"].map(length_to_offset)
+    df.dropna(subset=["offset"], inplace=True)
+    df["offset"] = df["offset"].astype(int)
+    df["p_site"] = df["start_position"] + df["offset"]
+
+    # Define custom hex colors for bins
+    bin_colors = ["#0099c6", "#17becf", "#19d3f3", "#00b5f7"]  # Customize these!
+
+    plot_html = ""
+    for gene_name in selected_genes:
+        df_gene = df[df["gene_name"] == gene_name]
+        if df_gene.empty:
+            continue
+
+        p_min = df_gene["p_site"].min()
+        p_max = df_gene["p_site"].max()
+        if p_max - p_min < (SKIP_5PRIME + SKIP_3PRIME):
+            continue
+
+        cds_start = p_min + SKIP_5PRIME
+        cds_end = p_max - SKIP_3PRIME
+        bin_edges = np.linspace(cds_start, cds_end + 1, NBINS + 1, dtype=int)
+        bin_labels = [f"Bin{i}" for i in range(1, NBINS + 1)]
+
+        df_filtered = df_gene[(df_gene["p_site"] >= cds_start) & (df_gene["p_site"] <= cds_end)].copy()
+        df_filtered["bin"] = pd.cut(df_filtered["p_site"], bins=bin_edges, labels=bin_labels, right=False)
+        bin_counts = df_filtered.groupby("bin")["read_id"].nunique()
+
+        # Get the color list matching the number of bins
+        bar_colors = bin_colors[:len(bin_counts)]  # Assign colors to bins
+
+        fig = px.bar(
+            x=bin_counts.index,
+            y=bin_counts.values,
+            labels={"x": "CDS Bins", "y": "Read Counts"},
+            title=f"Read Distribution for {gene_name} in {file_basename}",
+        )
+        fig.update_traces(marker=dict(color=bar_colors))  # Apply custom colors
+
+        plot_html += fig.to_html(full_html=False)
+
+    return plot_html, None
+
+def bin_counts_view(request):
+    """Renders the webpage with selectable Parquet files and corresponding bin count plots."""
+    parquet_files = get_available_parquet_files()
+    plots = None
+    error_message = None
+
+    if request.method == "POST":
+        selected_file = request.POST.get("selected_file")
+
+        if selected_file:
+            plots, error_message = get_bin_counts(selected_file)
+        else:
+            error_message = "No file selected!"
+
+    return render(request, "riboApp/binCounts.html", {
+        "parquet_files": parquet_files,
+        "plots": plots,
+        "error_message": error_message
+    })
+
+
+import os
+import glob
+import pandas as pd
+import numpy as np
+from django.shortcuts import render
+import plotly.express as px
+from sklearn.decomposition import PCA
+
+# ----------------- CONFIG -----------------
+GTF_FILE = "media/gencode.vM25.annotation.gtf"  # Path to GTF file
+PARQUET_FOLDER = "media/parquetFiles/"         # Path where Parquet files are stored
+
+
+def calculate_gene_lengths(gtf_file):
+    """Reads a GTF file and calculates gene lengths based on exon data."""
+    if not os.path.exists(gtf_file):
+        print("ERROR: GTF file not found!")
+        return pd.DataFrame()  # Return empty DataFrame to prevent crashes
+
+    col_names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"]
+    gtf_data = pd.read_csv(gtf_file, sep="\t", names=col_names, comment="#")
+
+    # Keep only exons
+    exon_data = gtf_data[gtf_data["feature"] == "exon"].copy()
+
+    # Extract gene_name from attribute
+    import re
+    def extract_gene_name(attr):
+        match = re.search(r'gene_name\s+"([^"]+)"', attr)
+        return match.group(1) if match else None  # Return None instead of UNKNOWN
+
+    exon_data["gene_name"] = exon_data["attribute"].apply(extract_gene_name)
+
+    # Remove rows where gene_name extraction failed
+    exon_data.dropna(subset=["gene_name"], inplace=True)
+
+    exon_data["length"] = exon_data["end"] - exon_data["start"] + 1
+
+    gene_lengths = exon_data.groupby("gene_name", as_index=False)["length"].sum()
+    gene_lengths["length_kb"] = gene_lengths["length"] / 1000
+    print(f"Extracted gene lengths for {len(gene_lengths)} genes.")
+    return gene_lengths[["gene_name", "length_kb"]]
+
+
+def process_parquet_file_gene_counts(file_path):
+    """Reads a Parquet file, sums read counts per gene."""
+    df = pd.read_parquet(file_path)
+
+    if "gene_name" not in df.columns or "read_count" not in df.columns:
+        raise ValueError(f"Missing required columns in {file_path}")
+
+    gene_counts = df.groupby("gene_name", as_index=False)["read_count"].sum()
+    gene_counts["file_name"] = os.path.basename(file_path)
+    return gene_counts
+
+
+def pca_gene_counts(request):
+    """
+    View to process gene counts from all Parquet files, normalize using RPKM,
+    perform PCA, and display the interactive PCA plot on the webpage.
+    """
+    if not os.path.exists(GTF_FILE):
+        return render(request, "riboApp/error.html", {"error_message": "GTF file not found!"})
+
+    # Compute gene lengths
+    gene_lengths = calculate_gene_lengths(GTF_FILE)
+
+    if gene_lengths.empty:
+        return render(request, "riboApp/error.html", {"error_message": "No gene lengths extracted from GTF!"})
+
+    print(gene_lengths.head())  # Debugging output
+
+    # Load all Parquet files
+    parquet_files = glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet"))
+    if not parquet_files:
+        return render(request, "riboApp/error.html", {"error_message": "No Parquet files found!"})
+
+    all_counts = []
+    for file in parquet_files:
+        df_counts = process_parquet_file_gene_counts(file)
+        all_counts.append(df_counts)
+
+    # Merge all files into one DataFrame
+    gene_counts_df = pd.concat(all_counts, ignore_index=True)
+
+    # Ensure gene names match in format
+    gene_counts_df["gene_name"] = gene_counts_df["gene_name"].str.strip().str.lower()
+    gene_lengths["gene_name"] = gene_lengths["gene_name"].str.strip().str.lower()
+
+    # Merge with gene lengths
+    gene_counts_df = pd.merge(gene_counts_df, gene_lengths, on="gene_name", how="left")
+
+    # Debugging: Check if 'length_kb' column exists
+    print(f"Columns in merged DataFrame: {gene_counts_df.columns.tolist()}")
+
+    if "length_kb" not in gene_counts_df.columns:
+        return render(request, "riboApp/error.html", {"error_message": "'length_kb' column missing after merging!"})
+
+    # Drop genes with missing length info
+    gene_counts_df.dropna(subset=["length_kb"], inplace=True)
+
+    # Ensure 'length_kb' is numeric
+    gene_counts_df["length_kb"] = pd.to_numeric(gene_counts_df["length_kb"], errors="coerce")
+
+    print(f"After filtering, {len(gene_counts_df)} rows remain.")
+
+    # Fix: Pivot & Ensure `length_kb` Stays
+    pivot_df = gene_counts_df.pivot_table(index="gene_name", columns="file_name", values="read_count", fill_value=0).reset_index()
+
+    # Reattach `length_kb`
+    pivot_df = pivot_df.merge(gene_counts_df[["gene_name", "length_kb"]].drop_duplicates(), on="gene_name", how="left")
+
+    # Ensure 'length_kb' is numeric after merging again
+    pivot_df["length_kb"] = pd.to_numeric(pivot_df["length_kb"], errors="coerce")
+
+    if pivot_df.empty:
+        return render(request, "riboApp/error.html", {"error_message": "No valid gene count data after pivoting!"})
+
+    print(f"Pivoted DataFrame shape: {pivot_df.shape}")
+    print(f"Columns in fixed pivot_df: {pivot_df.columns.tolist()}")  # Debugging
+
+    # RPKM Normalization
+    sample_cols = [col for col in pivot_df.columns if col not in ("gene_name", "length_kb")]
+
+    for col in sample_cols:
+        pivot_df[col] = (pivot_df[col] / pivot_df["length_kb"]) * 1e6 / pivot_df[col].sum()
+
+    # Perform PCA
+    pca = PCA(n_components=2)
+    pca_results = pca.fit_transform(pivot_df[sample_cols].T)
+
+    # Create DataFrame for PCA plot
+    pca_df = pd.DataFrame({"PC1": pca_results[:, 0], "PC2": pca_results[:, 1], "file": sample_cols})
+
+    # Generate interactive PCA plot
+    fig = px.scatter(
+        pca_df, x="PC1", y="PC2", text="file", color="PC1",
+        title="PCA of Gene Counts (RPKM Normalized)"
+    )
+    fig.update_traces(textposition="top center")
+    pca_plot_html = fig.to_html(full_html=False)
+
+    return render(request, "riboApp/pca_plot.html", {"pca_plot": pca_plot_html})
+
+def metagene_analysis(request):
+    """View to display start and stop codon metagene analysis."""
+    start_plot_path = "downloads/start_codon_coverage.png"
+    stop_plot_path = "downloads/stop_codon_coverage.png"
+
+    context = {
+        "start_plot": start_plot_path,
+        "stop_plot": stop_plot_path
+    }
+
+    return render(request, "riboApp/coverageGraphs.html", context)
+
+import os
+import glob
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from ribopy import Ribo
+from django.shortcuts import render
+from django.http import JsonResponse
+
+# Paths
+RIBO_DIR = "media/ribo"
+PSITE_OFFSETS_PATH = "media/uorf_psite_offset.csv"
+
+def get_available_ribo_files():
+    """Returns a list of available ribo files."""
+    return [os.path.basename(f) for f in glob.glob(os.path.join(RIBO_DIR, "*.ribo"))]
+
+def get_total_reads(ribo_obj):
+    """Retrieve total read count for a Ribo object."""
+    return ribo_obj.get_info()["experiment_info"]["total_reads"]
+
+def read_metagene_data(ribo_obj, site, range_lower, range_upper):
+    """Extracts metagene coverage for start/stop codons within length range."""
+    metagene_data = []
+
+    for read_length in range(range_lower, range_upper + 1):
+        data = ribo_obj.get_metagene_data(site, length=read_length)
+        df = pd.DataFrame(data, columns=["position", "count"])
+        df["experiment"] = ribo_obj.experiment_name
+        df["read_length"] = read_length
+        metagene_data.append(df)
+
+    return pd.concat(metagene_data, ignore_index=True)
+
+def apply_psite_shifts(metagene_data, psite_offsets, total_reads):
+    """Applies P-site shifts, normalizes by total reads, and averages across lengths."""
+    metagene_data = metagene_data.merge(psite_offsets, on=["experiment", "read_length"], how="left")
+    metagene_data["shifted_position"] = metagene_data["position"] + metagene_data["P_site_offset"]
+    metagene_data["normalized_count"] = (metagene_data["count"] / total_reads) * 1e6
+
+    return (metagene_data
+            .groupby(["shifted_position", "experiment"])
+            .agg(avg_count=("normalized_count", "mean"))
+            .reset_index())
+
+def generate_plots(start_shifted, stop_shifted):
+    """Generates and saves plots for start and stop codon coverage."""
+    custom_colors = ["#4682B4", "#EE82EE", "#9400D3", "#40E0D0"]  # Custom colors
+
+    # Start Codon Coverage Plot
+    plt.figure(figsize=(10, 5))
+    sns.lineplot(data=start_shifted, x="shifted_position", y="avg_count", hue="experiment", palette=custom_colors)
+    plt.title("Start Codon Coverage After Shifts")
+    plt.xlabel("Shifted Position")
+    plt.ylabel("Normalized Read Count (CPM)")
+    plt.xlim(-30, 62)
+    plt.legend(title="Experiment")
+    plt.grid()
+    plt.savefig("media/plots/start_codon_coverage.png")
+    plt.close()
+
+    # Stop Codon Coverage Plot
+    plt.figure(figsize=(10, 5))
+    sns.lineplot(data=stop_shifted, x="shifted_position", y="avg_count", hue="experiment", palette=custom_colors)
+    plt.title("Stop Codon Coverage After Shifts")
+    plt.xlabel("Shifted Position")
+    plt.ylabel("Normalized Read Count (CPM)")
+    plt.xlim(0, 20)
+    plt.ylim(0, 50)
+    plt.legend(title="Experiment")
+    plt.grid()
+    plt.savefig("media/plots/stop_codon_coverage.png")
+    plt.close()
+
+def analyze_ribo(request):
+    """Handles user input for selecting a ribo file and generates plots accordingly."""
+    ribo_files = get_available_ribo_files()
+    selected_file = request.GET.get("ribo_file", "")
+
+    if selected_file:
+        ribo_path = os.path.join(RIBO_DIR, selected_file)
+        ribo_obj = Ribo(ribo_path)
+
+        # Load P-site offsets
+        psite_offsets = pd.read_csv(PSITE_OFFSETS_PATH)
+        psite_offsets.columns = ["experiment", "read_length", "P_site_offset"]
+        psite_offsets = psite_offsets.drop_duplicates(subset=["experiment", "read_length"])
+
+        total_reads = get_total_reads(ribo_obj)
+
+        # Retrieve metagene coverage
+        start_coverage = read_metagene_data(ribo_obj, "start", 28, 32)
+        stop_coverage = read_metagene_data(ribo_obj, "stop", 28, 32)
+
+        # Apply P-site shifts and normalization
+        start_shifted = apply_psite_shifts(start_coverage, psite_offsets, total_reads)
+        stop_shifted = apply_psite_shifts(stop_coverage, psite_offsets, total_reads)
+
+        # Generate and save plots
+        generate_plots(start_shifted, stop_shifted)
+
+        return JsonResponse({"message": "Plots generated successfully!"})
+
+    return render(request, "riboApp/coverageGraphs.html", {"ribo_files": ribo_files})
