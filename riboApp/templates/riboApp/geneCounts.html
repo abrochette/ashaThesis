@@ -1,27 +1,103 @@
 {% extends 'riboApp/base.html' %}
-{% load plotly_dash %}
 
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gene Scatter Plot</title>
-</head>
-<body>
+{% block content %}
 
-    <h1>Interactive Gene Scatter Plot</h1>
+<h1>Gene Scatter Plot</h1>
 
-    <!-- Embed the Dash scatter plot -->
+<form method="POST">
+    {% csrf_token %}
 
-    <div class="{%plotly_class name='geneCounts' %} card"></div>
-    {% plotly_app name="geneCounts" %}
-
-    <h2>Selected Genes</h2>
-    <ul>
-        {% for gene in selected_genes %}
-            <li>{{ gene.gene_name }}</li>
+    <label for="file1">Select File for X-Axis:</label>
+    <select name="file1" id="file1">
+        <option value="">-- Select a file --</option>
+        {% for file in parquet_files %}
+            <option value="{{ file }}">{{ file }}</option>
         {% endfor %}
-    </ul>
+    </select>
 
-</body>
-</html>
+    <label for="file2">Select File for Y-Axis:</label>
+    <select name="file2" id="file2">
+        <option value="">-- Select a file --</option>
+        {% for file in parquet_files %}
+            <option value="{{ file }}">{{ file }}</option>
+        {% endfor %}
+    </select>
+
+    <button type="submit">Generate Plot</button>
+</form>
+
+<div id="plot-container">
+    {% if plot_div %}
+        <div>{{ plot_div|safe }}</div>  <!-- Render Plotly figure -->
+    {% else %}
+        <p>No plot generated yet.</p>
+    {% endif %}
+</div>
+
+<h3>Clicked Genes</h3>
+<textarea id="clicked-genes" style="width:100%; height:100px;" readonly></textarea>
+<button id="save-button">Save Selected Genes</button>
+<div id="save-status" style="color: green; margin-top: 10px;"></div>
+
+<h3>Selected Genes:</h3>
+<ul>
+    {% for gene in selected_genes %}
+        <li>{{ gene.gene_name }}</li>
+    {% empty %}
+        <li>No genes selected.</li>
+    {% endfor %}
+</ul>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    let selectedGenes = [];
+
+    function attachClickListener() {
+        let plotElement = document.querySelector(".js-plotly-plot");
+
+        if (plotElement) {
+            console.log("✅ Plotly graph found. Listening for clicks...");
+
+            plotElement.on("plotly_click", function (data) {
+                console.log("✅ Click event detected:", data);  // Debugging output
+
+                if (data && data.points.length > 0) {
+                    const geneName = data.points[0].hovertext;
+
+                    if (geneName && !selectedGenes.includes(geneName)) {
+                        selectedGenes.push(geneName);
+                        document.getElementById("clicked-genes").value = selectedGenes.join("\n");
+                        console.log("✅ Clicked gene:", geneName);
+                    }
+                }
+            });
+        } else {
+            console.error("❌ Plotly graph element not found! Retrying in 1 second...");
+            setTimeout(attachClickListener, 1000);  // Retry in 1 second if graph not yet loaded
+        }
+    }
+
+    attachClickListener();
+
+    // ✅ Send selected genes to Django when "Save" is clicked
+    document.getElementById("save-button").addEventListener("click", function () {
+        console.log("✅ Sending genes to Django:", selectedGenes);
+
+        fetch("/save_selected_genes/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}"
+            },
+            body: JSON.stringify({ "genes": selectedGenes })
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById("save-status").innerText = data.message;
+            console.log("✅ Django Response:", data);
+        })
+        .catch(error => console.error("❌ Error saving genes:", error));
+    });
+});
+</script>
+{% endblock %}

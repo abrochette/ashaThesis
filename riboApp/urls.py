@@ -15,6 +15,8 @@ urlpatterns = [
     path('download/<str:file_name>/', views.download_file, name='download_file'),
     path("upload/", views.upload_parquet, name="upload_parquet"),
     path("geneCounts/", views.geneCounts, name="geneCounts"),
+    path("plot_gene_counts/", views.plot_gene_counts, name="plot_gene_counts"),
+    path("save_selected_genes/", views.save_selected_genes, name="save_selected_genes"),
 ]
 
 if settings.DEBUG:

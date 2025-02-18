@@ -208,62 +208,179 @@ def upload_parquet(request):
 
     return render(request, "riboApp/uploadParquet.html", {"form": form})
 
+
 from django.shortcuts import render
+from django.http import JsonResponse
+import plotly.express as px
+import pandas as pd
+import pyarrow.parquet as pq
+import os
+from riboApp.models import SelectedGene, ParquetData
+
+
+from django.views.decorators.csrf import csrf_exempt
+import json
+from django.http import JsonResponse
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
 from .models import SelectedGene
 
-def geneCounts(request):
-    import riboApp.geneCounts  # ✅ Ensure Dash app runs
-    selected_genes = SelectedGene.objects.all()
-    return render(request, "riboApp/geneCounts.html", {"selected_genes": selected_genes})
 
-def get_gene_counts():
+@csrf_exempt  # Temporarily allow AJAX requests without CSRF issues
+def save_selected_genes(request):
     """
-    Reads uploaded Parquet files and extracts gene count data.
-    Returns a Pandas DataFrame.
+    Saves selected genes to the database.
     """
-    parquet_folder = "media/parquetFiles/"  # Adjust as needed
-    files = os.listdir(parquet_folder)
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            genes = data.get("genes", [])
 
-    all_data = []
+            print(f"✅ Received genes: {genes}")  # ✅ Debugging
 
-    for file in files:
-        file_path = os.path.join(parquet_folder, file)
+            for gene in genes:
+                SelectedGene.objects.get_or_create(gene_name=gene)
 
-        # Read only relevant columns
-        df = pq.read_table(file_path, columns=["gene_name", "read_count"]).to_pandas()
-        all_data.append(df)
+            return JsonResponse({"message": f"Saved {len(genes)} genes to database."})
 
-    df_merged = pd.concat(all_data, ignore_index=True)
+        except json.JSONDecodeError:
+            print("❌ JSON decoding error")  # ✅ Debugging
+            return JsonResponse({"error": "Invalid JSON format"}, status=400)
+
+    print("❌ Invalid request method")  # ✅ Debugging
+    return JsonResponse({"error": "Invalid request"}, status=400)
+
+
+
+from django.shortcuts import render
+import plotly.express as px
+import pandas as pd
+import os
+import pyarrow.parquet as pq
+from .models import SelectedGene
+
+from django.shortcuts import render, redirect
+from django.http import JsonResponse
+import plotly.express as px
+import pandas as pd
+import os
+import pyarrow.parquet as pq
+from .models import SelectedGene
+
+# ✅ Function to list available Parquet files
+def get_available_parquet_files():
+    parquet_folder = "media/parquetFiles/"
+    files = [f for f in os.listdir(parquet_folder) if f.endswith(".parquet")]
+    print(f"Available Parquet Files: {files}")  # ✅ Debugging
+    return files
+
+# ✅ Function to read and merge selected Parquet files
+def get_gene_counts(file1, file2):
+    """
+    Efficiently reads two selected Parquet files in chunks, merges data on `gene_name`,
+    and returns a Pandas DataFrame containing only genes that exist in both files.
+    """
+    parquet_folder = "media/parquetFiles/"
+    file1_path = os.path.join(parquet_folder, file1)
+    file2_path = os.path.join(parquet_folder, file2)
+
+    # ✅ Store gene read counts in dictionaries for quick lookups
+    gene_counts_1 = {}
+    gene_counts_2 = {}
+
+    # ✅ Read only "gene_name" and "read_count" columns in small chunks
+    for batch in pq.ParquetFile(file1_path).iter_batches(batch_size=100000, columns=["gene_name", "read_count"]):
+        df_chunk = batch.to_pandas()
+        for _, row in df_chunk.iterrows():
+            gene_counts_1[row["gene_name"]] = gene_counts_1.get(row["gene_name"], 0) + row["read_count"]
+
+    for batch in pq.ParquetFile(file2_path).iter_batches(batch_size=100000, columns=["gene_name", "read_count"]):
+        df_chunk = batch.to_pandas()
+        for _, row in df_chunk.iterrows():
+            gene_counts_2[row["gene_name"]] = gene_counts_2.get(row["gene_name"], 0) + row["read_count"]
+
+    # ✅ Find common genes (only keep genes present in both files)
+    common_genes = set(gene_counts_1.keys()) & set(gene_counts_2.keys())
+
+    # ✅ Build final DataFrame (only for common genes)
+    df_merged = pd.DataFrame({
+        "gene_name": list(common_genes),
+        "read_count_x": [gene_counts_1[g] for g in common_genes],
+        "read_count_y": [gene_counts_2[g] for g in common_genes],
+    })
+
+    print(f"✅ Processed {len(common_genes)} common genes for {file1} and {file2}")
 
     return df_merged
-
-
-def plot_gene_counts(request):
-    """
-    Generates a Plotly scatter plot for genes and returns JSON data.
-    """
-    df = get_gene_counts()
-
-    # Check if there are at least two distinct samples
-    if len(df["gene_name"].unique()) < 2:
-        return JsonResponse({"error": "Not enough data to generate a scatter plot."})
-
-    fig = px.scatter(
-        df,
-        x="read_count",
-        y="read_count",
-        hover_name="gene_name",
-        title="Gene Read Counts",
-    )
-
-    # Convert figure to JSON
-    fig_json = fig.to_json()
-
-    return JsonResponse(fig_json, safe=False)
-
-
+# ✅ Main View: Render the page with dropdowns for file selection
 def geneCounts(request):
     """
-    Renders the gene counts page.
+    Renders the gene counts page with dropdowns for file selection and generates a scatter plot.
     """
-    return render(request, "riboApp/geneCounts.html")
+    selected_genes = SelectedGene.objects.all()
+    parquet_files = get_available_parquet_files()
+    plot_div = None
+
+    if request.method == "POST":
+        file1 = request.POST.get("file1")
+        file2 = request.POST.get("file2")
+
+        if file1 and file2:
+            df = get_gene_counts(file1, file2)
+            print(f"✅ Generating scatter plot for {file1} (X-axis) vs {file2} (Y-axis)")
+
+            fig = px.scatter(
+                df,
+                x="read_count_x",
+                y="read_count_y",
+                hover_name="gene_name",
+                title=f"Gene Read Counts: {file1} vs {file2}",
+                labels={"read_count_x": file1, "read_count_y": file2},
+            )
+
+            plot_div = fig.to_html(full_html=False)  # Convert to HTML for rendering
+
+    return render(request, "riboApp/geneCounts.html", {
+        "selected_genes": selected_genes,
+        "parquet_files": parquet_files,
+        "plot_div": plot_div
+    })
+def plot_gene_counts(request):
+    file1 = request.GET.get("file1")
+    file2 = request.GET.get("file2")
+
+    if not file1 or not file2:
+        print("ERROR: No files selected!")  # ✅ Debugging
+        return JsonResponse({"error": "No files selected."})
+
+    df = get_gene_counts(file1, file2)
+
+    print(f"DataFrame Shape: {df.shape}")  # ✅ Debugging
+    print(df.head())  # ✅ Debugging
+
+    if df["source_file"].nunique() < 2:
+        print("ERROR: Not enough data!")  # ✅ Debugging
+        return JsonResponse({"error": "Not enough data for scatter plot."})
+
+    df_pivot = df.pivot(index="gene_name", columns="source_file", values="read_count").reset_index()
+
+    if df_pivot.empty:
+        print("ERROR: Pivot table is empty!")  # ✅ Debugging
+        return JsonResponse({"error": "Pivot table is empty!"})
+
+    df_pivot.columns = ["gene_name", "X_Axis", "Y_Axis"]
+
+    fig = px.scatter(
+        df_pivot,
+        x="X_Axis",
+        y="Y_Axis",
+        hover_name="gene_name",
+        title=f"Gene Read Counts: {file1} vs {file2}",
+        labels={"X_Axis": file1, "Y_Axis": file2}
+    )
+
+    print("✅ Plot Generated Successfully")  # ✅ Debugging
+
+    return JsonResponse(fig.to_json(), safe=False)
