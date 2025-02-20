@@ -77,11 +77,7 @@ document.addEventListener("DOMContentLoaded", function () {
         let plotElement = document.querySelector(".js-plotly-plot");
 
         if (plotElement) {
-            console.log("✅ Plotly graph found. Listening for clicks...");
-
             plotElement.on("plotly_click", function (data) {
-                console.log("✅ Click event detected:", data);
-
                 if (data && data.points.length > 0) {
                     const geneName = data.points[0].hovertext;
 
@@ -94,7 +90,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             });
         } else {
-            console.error("❌ Plotly graph element not found! Retrying in 1 second...");
             setTimeout(attachClickListener, 1000);
         }
     }
@@ -103,8 +98,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // ✅ Send selected genes to Django when "Save" is clicked
     document.getElementById("save-button")?.addEventListener("click", function () {
-        console.log("✅ Sending genes to Django:", selectedGenes);
-
         fetch("/save_selected_genes/", {
             method: "POST",
             headers: {
@@ -116,7 +109,6 @@ document.addEventListener("DOMContentLoaded", function () {
         .then(response => response.json())
         .then(data => {
             document.getElementById("save-status").innerText = data.message;
-            console.log("✅ Django Response:", data);
         })
         .catch(error => console.error("Error saving genes:", error));
     });
@@ -126,9 +118,7 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("clicked-genes").value = ""; // Clear textarea
     document.getElementById("save-status").innerText = "Selection cleared.";
     updateGeneList();
-    console.log("✅ Cleared selected genes from UI and database.");
 
-    // ✅ Send an empty list to Django to delete all stored genes
     fetch("/save_selected_genes/", {
         method: "POST",
         headers: {
@@ -139,9 +129,9 @@ document.addEventListener("DOMContentLoaded", function () {
     })
     .then(response => response.json())
     .then(data => {
-        console.log("✅ Django Response after clearing database:", data);
+        console.log("django Response after clearing database:", data);
     })
-    .catch(error => console.error("❌ Error clearing database:", error));
+    .catch(error => console.error("Error clearing database:", error));
     });
 
     function updateGeneList() {

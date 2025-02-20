@@ -406,16 +406,12 @@ def get_available_parquet_files():
 
 
 def get_bin_counts(selected_file):
-    """Efficiently loads and plots bin counts for selected genes."""
-
-    # ✅ Load only currently selected genes (NO preloaded old genes)
     selected_genes = load_selected_genes()
     print("🔍 Selected genes:", selected_genes)
 
     if not selected_genes:
         return None, "No selected genes found!"
 
-    # ✅ Improve caching by using only the selected file & genes
     genes_key = "_".join(sorted(selected_genes))
     cache_key = f"bin_counts_{selected_file}_{genes_key}"
 
@@ -424,7 +420,6 @@ def get_bin_counts(selected_file):
         print(f"✅ Loaded bin count plots from cache for {selected_file}")
         return cached_plots, None
 
-    # ✅ Load P-site offsets for only the selected experiment
     file_basename = os.path.splitext(selected_file)[0]
     offsets_df = pd.read_csv(OFFSET_CSV)
     offsets_df = offsets_df[offsets_df["Experiment"] == file_basename]
@@ -434,25 +429,20 @@ def get_bin_counts(selected_file):
 
     length_to_offset = dict(zip(offsets_df["Read Length"], offsets_df["P-site Offset"]))
 
-    # ✅ Load only required columns from Parquet file instead of full dataset
     file_path = os.path.join(PARQUET_FOLDER, selected_file)
     df = pq.read_table(file_path, columns=["gene_name", "read_length", "start_position"]).to_pandas()
 
-    # ✅ Use `query()` instead of `.isin()` for optimized filtering
     df = df.query("gene_name in @selected_genes")
 
     if df.empty:
         return None, f"No data found for selected genes in {selected_file}!"
 
-    # ✅ Apply P-site offsets directly using `.map()`
     df["offset"] = df["read_length"].map(length_to_offset)
     df.dropna(subset=["offset"], inplace=True)
     df["p_site"] = df["start_position"] + df["offset"].astype(int)
 
     bin_colors = ["#0099c6", "#17becf", "#19d3f3", "#00b5f7"]
     plot_html = ""
-
-    # ✅ Process bins efficiently per gene
     for gene_name in selected_genes:
         df_gene = df.query("gene_name == @gene_name")
 
@@ -463,7 +453,6 @@ def get_bin_counts(selected_file):
         if p_max - p_min < (SKIP_5PRIME + SKIP_3PRIME):
             continue
 
-        # ✅ Define bin edges BEFORE filtering to match R logic
         cds_start, cds_end = p_min + SKIP_5PRIME, p_max - SKIP_3PRIME
         bin_edges = np.linspace(cds_start, cds_end + 1, NBINS + 1, dtype=int)
 
@@ -473,7 +462,6 @@ def get_bin_counts(selected_file):
 
         bin_counts = df_filtered.groupby("bin")["gene_name"].count()
 
-        # ✅ Generate optimized Plotly bar graph
         fig = px.bar(
             x=bin_counts.index,
             y=bin_counts.values,
@@ -483,9 +471,8 @@ def get_bin_counts(selected_file):
         fig.update_traces(marker=dict(color=bin_colors[:len(bin_counts)]))
         plot_html += fig.to_html(full_html=False)
 
-    # ✅ Cache only the required plots for efficiency
     cache.set(cache_key, plot_html, timeout=None)
-    print(f"✅ Stored bin count plots in cache for {selected_file}")
+    print(f"Stored bin count plots in cache for {selected_file}")
     return plot_html, None
 
 
@@ -634,7 +621,7 @@ def pca_gene_counts(request):
 
     # Cache the result indefinitely (or set a timeout if you prefer)
     cache.set(cache_key, pca_plot_html, timeout=None)
-    print("✅ Stored PCA plot in cache.")
+    print("Stored PCA plot in cache.")
     return render(request, "riboApp/pca_plot.html", {"pca_plot": pca_plot_html})
 
 
@@ -707,21 +694,19 @@ def read_multiple_files(ribo_files, site, range_lower=28, range_upper=32):
                 df_list.append(df_melted)
 
     if not df_list:
-        print("❌ ERROR: No data collected from `read_multiple_files()`")
+        print("ERROR: No data collected from `read_multiple_files()`")
 
     return pd.concat(df_list, ignore_index=True) if df_list else pd.DataFrame()
 def apply_psite_shift_and_average(metagene_data, psite_offsets, total_reads_dict):
     """Applies P-site shifts, averages counts, and normalizes by total reads."""
 
     if metagene_data.empty:
-        print("❌ ERROR: metagene_data is EMPTY! Check previous functions!")
         return pd.DataFrame()
 
     # Ensure necessary columns exist
     expected_columns = {"experiment", "read_length", "position", "count"}
     missing_cols = expected_columns - set(metagene_data.columns)
     if missing_cols:
-        print(f"❌ ERROR: Missing columns in metagene_data: {missing_cols}")
         print(metagene_data.head())  # Print first few rows for debugging
         return pd.DataFrame()
 
@@ -741,7 +726,7 @@ def apply_psite_shift_and_average(metagene_data, psite_offsets, total_reads_dict
 
     # Ensure "experiment" exists before returning
     if "experiment" not in metagene_data.columns:
-        print("❌ ERROR: 'experiment' column missing after processing!")
+        print("ERROR: 'experiment' column missing after processing!")
         return pd.DataFrame()
 
     return metagene_data.groupby(["shifted_position", "experiment"], as_index=False)["avg_count"].mean()
@@ -751,14 +736,14 @@ def plot_static_graph(data, title, x_label, y_label, filename, xlim=None, ylim=N
     """Generates and saves a static matplotlib plot."""
 
     if data.empty:
-        print(f"❌ ERROR: Data is EMPTY for {title}")
+        print(f"ERROR: Data is EMPTY for {title}")
         return None  # Return None to prevent further errors
 
     # Ensure necessary columns exist
     required_columns = {"experiment", "shifted_position", "avg_count"}
     missing_cols = required_columns - set(data.columns)
     if missing_cols:
-        print(f"❌ ERROR: Missing columns in data for {title}: {missing_cols}")
+        print(f"ERROR: Missing columns in data for {title}: {missing_cols}")
         print(data.head())
         return None
 
@@ -769,7 +754,7 @@ def plot_static_graph(data, title, x_label, y_label, filename, xlim=None, ylim=N
 
     for i, (experiment, subset) in enumerate(data.groupby("experiment")):
         if subset.empty:
-            print(f"⚠️ WARNING: No data for experiment {experiment} in {title}")
+            print(f"WARNING: No data for experiment {experiment} in {title}")
             continue
 
         color = color_palette[i % len(color_palette)]  # Assign color
