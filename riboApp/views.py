@@ -26,6 +26,7 @@ import pyarrow.parquet as pq
 from .models import SelectedGene
 
 
+
 def reformatFilepaths(file_content):
     """
     Reformats the user-provided file content into YAML-compatible structure.
@@ -240,7 +241,7 @@ def upload_parquet(request):
 @csrf_exempt  # Temporarily allow AJAX requests without CSRF issues
 def save_selected_genes(request):
     """
-    Saves selected genes to the database.
+    Saves or clears selected genes in the database.
     """
     if request.method == "POST":
         try:
@@ -249,6 +250,13 @@ def save_selected_genes(request):
 
             print(f"Received genes: {genes}")
 
+            if not genes:
+                # ✅ If the list is empty, clear all selected genes from the database
+                SelectedGene.objects.all().delete()
+                return JsonResponse({"message": "All genes removed from database."})
+
+            # ✅ Otherwise, store only the provided genes
+            SelectedGene.objects.all().delete()  # Ensure previous genes are removed
             for gene in genes:
                 SelectedGene.objects.get_or_create(gene_name=gene)
 
@@ -395,80 +403,91 @@ def load_selected_genes():
 def get_available_parquet_files():
     return [f for f in os.listdir(PARQUET_FOLDER) if f.endswith(".parquet")]
 
+
+
 def get_bin_counts(selected_file):
+    """Efficiently loads and plots bin counts for selected genes."""
+
+    # ✅ Load only currently selected genes (NO preloaded old genes)
     selected_genes = load_selected_genes()
+    print("🔍 Selected genes:", selected_genes)
+
     if not selected_genes:
         return None, "No selected genes found!"
 
+    # ✅ Improve caching by using only the selected file & genes
     genes_key = "_".join(sorted(selected_genes))
     cache_key = f"bin_counts_{selected_file}_{genes_key}"
+
     cached_plots = cache.get(cache_key)
     if cached_plots is not None:
         print(f"✅ Loaded bin count plots from cache for {selected_file}")
         return cached_plots, None
 
+    # ✅ Load P-site offsets for only the selected experiment
     file_basename = os.path.splitext(selected_file)[0]
     offsets_df = pd.read_csv(OFFSET_CSV)
     offsets_df = offsets_df[offsets_df["Experiment"] == file_basename]
+
     if offsets_df.empty:
         return None, f"No P-site offsets found for {file_basename}!"
 
     length_to_offset = dict(zip(offsets_df["Read Length"], offsets_df["P-site Offset"]))
 
-    # Load the selected Parquet file
+    # ✅ Load only required columns from Parquet file instead of full dataset
     file_path = os.path.join(PARQUET_FOLDER, selected_file)
-    df = pd.read_parquet(file_path)
-    df = df[df["gene_name"].isin(selected_genes)]
+    df = pq.read_table(file_path, columns=["gene_name", "read_length", "start_position"]).to_pandas()
+
+    # ✅ Use `query()` instead of `.isin()` for optimized filtering
+    df = df.query("gene_name in @selected_genes")
+
     if df.empty:
         return None, f"No data found for selected genes in {selected_file}!"
 
-    # Apply offsets to calculate the P-site positions
+    # ✅ Apply P-site offsets directly using `.map()`
     df["offset"] = df["read_length"].map(length_to_offset)
     df.dropna(subset=["offset"], inplace=True)
-    df["offset"] = df["offset"].astype(int)
-    df["p_site"] = df["start_position"] + df["offset"]
+    df["p_site"] = df["start_position"] + df["offset"].astype(int)
 
-    # Define custom hex colors for bins
     bin_colors = ["#0099c6", "#17becf", "#19d3f3", "#00b5f7"]
-
     plot_html = ""
-    # For each gene in the selected set, generate a bar plot
+
+    # ✅ Process bins efficiently per gene
     for gene_name in selected_genes:
-        df_gene = df[df["gene_name"] == gene_name]
+        df_gene = df.query("gene_name == @gene_name")
+
         if df_gene.empty:
             continue
 
-        p_min = df_gene["p_site"].min()
-        p_max = df_gene["p_site"].max()
+        p_min, p_max = df_gene["p_site"].min(), df_gene["p_site"].max()
         if p_max - p_min < (SKIP_5PRIME + SKIP_3PRIME):
             continue
 
-        cds_start = p_min + SKIP_5PRIME
-        cds_end = p_max - SKIP_3PRIME
+        # ✅ Define bin edges BEFORE filtering to match R logic
+        cds_start, cds_end = p_min + SKIP_5PRIME, p_max - SKIP_3PRIME
         bin_edges = np.linspace(cds_start, cds_end + 1, NBINS + 1, dtype=int)
-        bin_labels = [f"Bin{i}" for i in range(1, NBINS + 1)]
 
-        df_filtered = df_gene[(df_gene["p_site"] >= cds_start) & (df_gene["p_site"] <= cds_end)].copy()
-        df_filtered["bin"] = pd.cut(df_filtered["p_site"], bins=bin_edges, labels=bin_labels, right=False)
-        bin_counts = df_filtered.groupby("bin")["read_id"].nunique()
+        df_filtered = df_gene.query("p_site >= @cds_start and p_site <= @cds_end")
+        df_filtered["bin"] = pd.cut(df_filtered["p_site"], bins=bin_edges,
+                                    labels=[f"Bin{i}" for i in range(1, NBINS + 1)], right=False)
 
-        # Use as many colors as there are bins
-        bar_colors = bin_colors[:len(bin_counts)]
+        bin_counts = df_filtered.groupby("bin")["gene_name"].count()
 
-        # Generate the Plotly bar graph
+        # ✅ Generate optimized Plotly bar graph
         fig = px.bar(
             x=bin_counts.index,
             y=bin_counts.values,
             labels={"x": "CDS Bins", "y": "Read Counts"},
             title=f"Read Distribution for {gene_name} in {file_basename}",
         )
-        fig.update_traces(marker=dict(color=bar_colors))
+        fig.update_traces(marker=dict(color=bin_colors[:len(bin_counts)]))
         plot_html += fig.to_html(full_html=False)
 
-    # Cache the generated plot HTML indefinitely (or set a timeout if desired)
+    # ✅ Cache only the required plots for efficiency
     cache.set(cache_key, plot_html, timeout=None)
     print(f"✅ Stored bin count plots in cache for {selected_file}")
     return plot_html, None
+
 
 def bin_counts_view(request):
     parquet_files = get_available_parquet_files()

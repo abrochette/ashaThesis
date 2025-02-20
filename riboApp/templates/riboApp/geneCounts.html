@@ -118,16 +118,30 @@ document.addEventListener("DOMContentLoaded", function () {
             document.getElementById("save-status").innerText = data.message;
             console.log("✅ Django Response:", data);
         })
-        .catch(error => console.error("❌ Error saving genes:", error));
+        .catch(error => console.error("Error saving genes:", error));
     });
 
-    // ✅ Clear Selected Genes when "Clear Selection" is clicked
     document.getElementById("clear-button")?.addEventListener("click", function () {
-        selectedGenes = [];
-        document.getElementById("clicked-genes").value = "";
-        document.getElementById("save-status").innerText = "Selection cleared.";
-        updateGeneList();
-        console.log("✅ Cleared selected genes.");
+    selectedGenes = []; // Reset the array
+    document.getElementById("clicked-genes").value = ""; // Clear textarea
+    document.getElementById("save-status").innerText = "Selection cleared.";
+    updateGeneList();
+    console.log("✅ Cleared selected genes from UI and database.");
+
+    // ✅ Send an empty list to Django to delete all stored genes
+    fetch("/save_selected_genes/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token }}"
+        },
+        body: JSON.stringify({ "genes": [] }) // Send empty array to trigger database reset
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log("✅ Django Response after clearing database:", data);
+    })
+    .catch(error => console.error("❌ Error clearing database:", error));
     });
 
     function updateGeneList() {
