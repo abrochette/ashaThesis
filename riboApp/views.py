@@ -396,14 +396,21 @@ NBINS = 4
 SKIP_5PRIME = 45
 SKIP_3PRIME = 15
 
+import os
+import pandas as pd
+import pyarrow.parquet as pq
+import numpy as np
+import plotly.express as px
+from django.shortcuts import render
+from django.core.cache import cache
+
+
 def load_selected_genes():
     selected_genes = SelectedGene.objects.values_list('gene_name', flat=True)
     return set(selected_genes)
 
 def get_available_parquet_files():
     return [f for f in os.listdir(PARQUET_FOLDER) if f.endswith(".parquet")]
-
-
 
 def get_bin_counts(selected_file):
     selected_genes = load_selected_genes()
@@ -412,12 +419,13 @@ def get_bin_counts(selected_file):
     if not selected_genes:
         return None, "No selected genes found!"
 
+    # Use a cache key so we don't re-generate plots unnecessarily
     genes_key = "_".join(sorted(selected_genes))
     cache_key = f"bin_counts_{selected_file}_{genes_key}"
 
     cached_plots = cache.get(cache_key)
     if cached_plots is not None:
-        print(f"✅ Loaded bin count plots from cache for {selected_file}")
+        print(f"Loaded bin count plots from cache for {selected_file}")
         return cached_plots, None
 
     file_basename = os.path.splitext(selected_file)[0]
@@ -442,7 +450,13 @@ def get_bin_counts(selected_file):
     df["p_site"] = df["start_position"] + df["offset"].astype(int)
 
     bin_colors = ["#0099c6", "#17becf", "#19d3f3", "#00b5f7"]
+    combined_bin_colors = ["#fa0087", "rgb(247, 129, 191)", "#fc1cbf", "rgb(254, 136, 177)"]
+
     plot_html = ""
+
+    # List to collect normalized bin counts across all genes
+    combined_fractions = []
+
     for gene_name in selected_genes:
         df_gene = df.query("gene_name == @gene_name")
 
@@ -450,18 +464,35 @@ def get_bin_counts(selected_file):
             continue
 
         p_min, p_max = df_gene["p_site"].min(), df_gene["p_site"].max()
+        # Skip if region is too short
         if p_max - p_min < (SKIP_5PRIME + SKIP_3PRIME):
             continue
 
-        cds_start, cds_end = p_min + SKIP_5PRIME, p_max - SKIP_3PRIME
+        cds_start = p_min + SKIP_5PRIME
+        cds_end   = p_max - SKIP_3PRIME
+
+        # Create 4 bin edges across the CDS region
         bin_edges = np.linspace(cds_start, cds_end + 1, NBINS + 1, dtype=int)
 
         df_filtered = df_gene.query("p_site >= @cds_start and p_site <= @cds_end")
-        df_filtered["bin"] = pd.cut(df_filtered["p_site"], bins=bin_edges,
-                                    labels=[f"Bin{i}" for i in range(1, NBINS + 1)], right=False)
 
-        bin_counts = df_filtered.groupby("bin")["gene_name"].count()
+        # Label each p_site with a bin
+        df_filtered["bin"] = pd.cut(
+            df_filtered["p_site"],
+            bins=bin_edges,
+            labels=[f"Bin{i}" for i in range(1, NBINS + 1)],
+            right=False
+        )
 
+        # Count reads per bin, ensuring we have 4 bins even if some are zero
+        bin_counts = (
+            df_filtered
+            .groupby("bin")["gene_name"]
+            .count()
+            .reindex([f"Bin{i}" for i in range(1, NBINS + 1)], fill_value=0)
+        )
+
+        # Generate the individual bar chart for this gene
         fig = px.bar(
             x=bin_counts.index,
             y=bin_counts.values,
@@ -471,8 +502,30 @@ def get_bin_counts(selected_file):
         fig.update_traces(marker=dict(color=bin_colors[:len(bin_counts)]))
         plot_html += fig.to_html(full_html=False)
 
+        # Normalize bin counts for this gene (turn into fractions)
+        total_reads = bin_counts.sum()
+        if total_reads > 0:
+            bin_fractions = bin_counts / total_reads
+            combined_fractions.append(bin_fractions.values)
+
+    # After processing all genes, make a combined average fraction plot
+    if combined_fractions:
+        # Average each bin across all genes
+        average_fractions = np.mean(combined_fractions, axis=0)
+
+        fig_combined = px.bar(
+            x=[f"Bin{i}" for i in range(1, NBINS + 1)],
+            y=average_fractions,
+            labels={"x": "CDS Bins", "y": "Average Fraction"},
+            title=f"Average Normalized Read Distribution for All Selected Genes in {file_basename}",
+        )
+        fig_combined.update_traces(marker=dict(color=combined_bin_colors[:len(average_fractions)]))
+        plot_html += fig_combined.to_html(full_html=False)
+
+    # Cache the final HTML
     cache.set(cache_key, plot_html, timeout=None)
     print(f"Stored bin count plots in cache for {selected_file}")
+
     return plot_html, None
 
 
@@ -490,12 +543,16 @@ def bin_counts_view(request):
         else:
             error_message = "No file selected!"
 
-    return render(request, "riboApp/binCounts.html", {
-        "parquet_files": parquet_files,
-        "plots": plots,
-        "error_message": error_message,
-        "selected_file": selected_file  # pass the selected file to the template
-    })
+    return render(
+        request,
+        "riboApp/binCounts.html",
+        {
+            "parquet_files": parquet_files,
+            "plots": plots,
+            "error_message": error_message,
+            "selected_file": selected_file,
+        },
+    )
 
 
 GTF_FILE = "media/gencode.vM25.annotation.gtf"  # Path to GTF file
