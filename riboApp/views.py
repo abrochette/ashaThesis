@@ -534,19 +534,34 @@ def process_parquet_file_gene_counts(file_path):
     gene_counts["file_name"] = os.path.basename(file_path)
     return gene_counts
 
+
+import hashlib
+
+import hashlib
+import glob
+import os
+import plotly.io as pio
+
+
 def build_pca_cache_key():
+    """Generates a cache key based only on input Parquet filenames (ignoring timestamps)."""
+
     if not os.path.exists(GTF_FILE):
         return None
-    gtf_mtime = os.path.getmtime(GTF_FILE)
-    parquet_files = sorted(glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet")))
-    parquet_key_parts = []
-    for f in parquet_files:
-        mtime = os.path.getmtime(f)
-        basename = os.path.basename(f)
-        parquet_key_parts.append(f"{basename}_{mtime}")
-    # Join the parts into one key string
-    key_string = f"pca_{int(gtf_mtime)}_" + "_".join(parquet_key_parts)
-    return key_string
+
+    parquet_files = sorted([
+        os.path.basename(f) for f in glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet"))
+        if not os.path.basename(f).startswith(".")  # Ignore hidden files
+    ])
+
+    if not parquet_files:
+        return "pca_no_parquet_files"
+
+    # ✅ Create a stable hash key using only the sorted filenames
+    key_string = "pca_" + "_".join(parquet_files)
+    hashed_key = hashlib.md5(key_string.encode()).hexdigest()
+
+    return f"pca_{hashed_key}"
 
 def pca_gene_counts(request):
 
@@ -556,10 +571,31 @@ def pca_gene_counts(request):
     cache_key = build_pca_cache_key()
     if cache_key is None:
         return render(request, "riboApp/error.html", {"error_message": "Failed to build cache key!"})
-    cached_plot = cache.get(cache_key)
-    if cached_plot is not None:
+
+    print(f"Checking cache for key: {cache_key}")
+
+    cached_plot_json = cache.get(cache_key)
+    if cached_plot_json is not None:
         print("Loaded PCA plot from cache.")
-        return render(request, "riboApp/pca_plot.html", {"pca_plot": cached_plot})
+
+        # Correctly reconstruct the figure using plotly.io.from_json()
+        fig = pio.from_json(cached_plot_json)  # 🔄 Fixed JSON deserialization
+        pca_plot_html = fig.to_html(full_html=False)  # Ensure HTML rendering
+
+        return render(request, "riboApp/pca_plot.html", {"pca_plot": pca_plot_html})
+
+    # Now, recompute the PCA plot (fig is defined here)
+    print("PCA plot NOT found in cache. Recomputing...")
+
+    print("Stored PCA plot in cache.")
+    #
+    # cache_key = build_pca_cache_key()
+    # if cache_key is None:
+    #     return render(request, "riboApp/error.html", {"error_message": "Failed to build cache key!"})
+    # cached_plot = cache.get(cache_key)
+    # if cached_plot is not None:
+    #     print("Loaded PCA plot from cache.")
+    #     return render(request, "riboApp/pca_plot.html", {"pca_plot": cached_plot})
 
     gene_lengths = calculate_gene_lengths(GTF_FILE)
     if gene_lengths.empty:
@@ -620,7 +656,9 @@ def pca_gene_counts(request):
     pca_plot_html = fig.to_html(full_html=False)
 
     # Cache the result indefinitely (or set a timeout if you prefer)
-    cache.set(cache_key, pca_plot_html, timeout=None)
+    # ✅ Store PCA plot as JSON before caching
+    pca_plot_json = fig.to_json()  # 🔄 Corrected storage format
+    cache.set(cache_key, pca_plot_json, timeout=None)
     print("Stored PCA plot in cache.")
     return render(request, "riboApp/pca_plot.html", {"pca_plot": pca_plot_html})
 
@@ -673,7 +711,7 @@ def read_multiple_files(ribo_files, site, range_lower=28, range_upper=32):
                 )
 
                 if df.empty:
-                    print(f"⚠️ WARNING: No metagene data found for {experiment}, {site}, length {read_length}")
+                    print(f"No metagene data found for {experiment}, {site}, length {read_length}")
                     continue  # Skip empty data
 
                 # Reset index to bring transcript and experiment into columns
