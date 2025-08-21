@@ -2,7 +2,7 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-    <h2>Upload Riboseq Parquet File</h2>
+    <h1>Upload Parquet Files</h1>
 
     {% if messages %}
         {% for message in messages %}
@@ -12,21 +12,53 @@
         {% endfor %}
     {% endif %}
 
-    <form method="post" enctype="multipart/form-data" class="form-group">
-        {% csrf_token %}
-        {{ ribo_form|crispy }}  <!-- Use Crispy Forms -->
-        <button type="submit" name="ribo_submit" class="btn btn-primary">Upload Riboseq File</button>
-    </form>
 
-    <hr>
 
-    <h2>Upload mRNA Parquet File</h2>
+    <!-- Bulk Upload Section -->
+    <div style="background-color: rgba(13, 110, 253, 0.1); border: 1px solid rgba(13, 110, 253, 0.2); border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+        <h2 style="color: #0d47a1; margin-top: 0;">Bulk Upload (Recommended)</h2>
 
-    <form method="post" enctype="multipart/form-data" class="form-group">
-        {% csrf_token %}
-        {{ mrna_form|crispy }}  <!-- Use Crispy Forms -->
-        <button type="submit" name="mrna_submit" class="btn" style="background-color: #ff7f0e; color: white;">Upload mRNA File</button>
-    </form>
+        <h3>Upload Multiple Riboseq Files</h3>
+        <form method="post" enctype="multipart/form-data" class="form-group">
+            {% csrf_token %}
+            {{ bulk_ribo_form|crispy }}
+            <button type="submit" name="bulk_ribo_submit" class="btn btn-primary" style="margin-top: 10px;">
+                Upload Multiple Riboseq Files
+            </button>
+        </form>
+
+        <hr style="margin: 20px 0;">
+
+        <h3>Upload Multiple mRNA Files</h3>
+        <form method="post" enctype="multipart/form-data" class="form-group">
+            {% csrf_token %}
+            {{ bulk_mrna_form|crispy }}
+            <button type="submit" name="bulk_mrna_submit" class="btn" style="background-color: #ff7f0e; color: white; margin-top: 10px;">
+                Upload Multiple mRNA Files
+            </button>
+        </form>
+    </div>
+
+    <!-- Single File Upload Section -->
+    <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+        <h2 style="color: #495057; margin-top: 0;">Single File Upload</h2>
+
+        <h3>Upload Single Riboseq File</h3>
+        <form method="post" enctype="multipart/form-data" class="form-group">
+            {% csrf_token %}
+            {{ ribo_form|crispy }}
+            <button type="submit" name="ribo_submit" class="btn btn-primary">Upload Riboseq File</button>
+        </form>
+
+        <hr style="margin: 20px 0;">
+
+        <h3>Upload Single mRNA File</h3>
+        <form method="post" enctype="multipart/form-data" class="form-group">
+            {% csrf_token %}
+            {{ mrna_form|crispy }}
+            <button type="submit" name="mrna_submit" class="btn" style="background-color: #ff7f0e; color: white;">Upload mRNA File</button>
+        </form>
+    </div>
 
     <hr>
 
@@ -80,4 +112,125 @@
         <small><strong>Note:</strong> Bin count analysis is only available for riboseq data since mRNA data doesn't contain P-site positioning information required for ribosome occupancy mapping.</small>
     </div>
 
+    <hr style="margin-top: 30px;">
+
+    <!-- Clear Files Section -->
+    <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; padding: 15px; margin-top: 20px;">
+        <h3 style="color: #721c24; margin-top: 0;">Clear All Files</h3>
+        <p style="color: #721c24; margin-bottom: 10px;">
+            <strong>Warning:</strong> This will permanently delete all uploaded parquet files, cached data, and analysis results.
+        </p>
+        <form method="post" action="{% url 'clear_parquet_files' %}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete ALL parquet files and data? This cannot be undone!');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger" style="background-color: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px;">
+                Clear All Files
+            </button>
+        </form>
+    </div>
+
 {% endblock %}
+
+<style>
+.file-drop-area {
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    margin: 10px 0;
+    transition: border-color 0.3s ease;
+}
+
+.file-drop-area.dragover {
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+
+.file-input-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.file-count {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #666;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add file count display functionality
+    function updateFileCount(input, countElement) {
+        const files = input.files;
+        if (files.length > 0) {
+            countElement.textContent = `${files.length} file(s) selected`;
+            countElement.style.color = '#28a745';
+        } else {
+            countElement.textContent = '';
+        }
+    }
+
+    // Setup file inputs with count display
+    const fileInputs = document.querySelectorAll('input[type="file"][multiple]');
+    fileInputs.forEach(function(input) {
+        // Create count display element
+        const countDiv = document.createElement('div');
+        countDiv.className = 'file-count';
+        input.parentNode.appendChild(countDiv);
+
+        // Add change event listener
+        input.addEventListener('change', function() {
+            updateFileCount(input, countDiv);
+        });
+
+        // Add drag and drop functionality
+        const wrapper = input.closest('.form-group');
+        if (wrapper) {
+            wrapper.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                wrapper.classList.add('dragover');
+            });
+
+            wrapper.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                wrapper.classList.remove('dragover');
+            });
+
+            wrapper.addEventListener('drop', function(e) {
+                e.preventDefault();
+                wrapper.classList.remove('dragover');
+
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    // Filter for .parquet files
+                    const parquetFiles = Array.from(files).filter(file =>
+                        file.name.toLowerCase().endsWith('.parquet')
+                    );
+
+                    if (parquetFiles.length > 0) {
+                        // Create a new FileList-like object
+                        const dt = new DataTransfer();
+                        parquetFiles.forEach(file => dt.items.add(file));
+                        input.files = dt.files;
+
+                        updateFileCount(input, countDiv);
+                    } else {
+                        alert('Please drop only .parquet files');
+                    }
+                }
+            });
+        }
+    });
+
+    // Add confirmation for clear files button
+    const clearButton = document.querySelector('button[name="clear_files"]');
+    if (clearButton) {
+        clearButton.addEventListener('click', function(e) {
+            if (!confirm('WARNING: This will permanently delete ALL uploaded parquet files, cached data, and analysis results.\n\nThis action cannot be undone!\n\nAre you absolutely sure you want to continue?')) {
+                e.preventDefault();
+            }
+        });
+    }
+});
+</script>

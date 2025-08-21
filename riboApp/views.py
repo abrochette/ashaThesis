@@ -4,7 +4,7 @@ from .models import ProcessingInput
 from .forms import CreateNewList
 import mimetypes
 import yaml
-from .forms import ParquetUploadForm, MrnaParquetUploadForm
+from .forms import ParquetUploadForm, MrnaParquetUploadForm, BulkParquetUploadForm, BulkMrnaParquetUploadForm
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
 import json
@@ -23,7 +23,8 @@ import pandas as pd
 import os
 from django.shortcuts import render, redirect
 import pyarrow.parquet as pq
-from .models import SelectedGene, UploadedMrnaParquet
+from .models import SelectedGene, UploadedMrnaParquet, UploadedParquet
+import shutil
 
 
 
@@ -205,6 +206,8 @@ def get_gene_reads(gene_name):
 def upload_parquet(request):
     ribo_form = ParquetUploadForm()
     mrna_form = MrnaParquetUploadForm()
+    bulk_ribo_form = BulkParquetUploadForm()
+    bulk_mrna_form = BulkMrnaParquetUploadForm()
 
     if request.method == "POST":
         # Check which form was submitted
@@ -260,10 +263,142 @@ def upload_parquet(request):
                 messages.success(request, f"mRNA file uploaded successfully: {uploaded_file.file.name}")
                 return redirect("upload_parquet")
 
+        elif 'bulk_ribo_submit' in request.POST:
+            bulk_ribo_form = BulkParquetUploadForm(request.POST, request.FILES)
+            if bulk_ribo_form.is_valid():
+                files = request.FILES.getlist('files')
+                successful_uploads = 0
+                failed_uploads = []
+
+                for file in files:
+                    if file.name.endswith('.parquet'):
+                        try:
+                            # Create UploadedParquet instance
+                            uploaded_file = UploadedParquet(file=file)
+                            uploaded_file.save()
+
+                            # Validate the file
+                            file_path = uploaded_file.file.path
+                            df = pq.read_table(file_path).to_pandas()
+
+                            required_columns = {"transcript_id", "gene_name", "start_position", "end_position",
+                                              "strand", "read_id", "read_length", "read_count", "region", "source_file"}
+
+                            missing_columns = required_columns - set(df.columns)
+                            if missing_columns:
+                                uploaded_file.delete()  # Remove invalid file
+                                failed_uploads.append(f"{file.name}: missing columns {', '.join(missing_columns)}")
+                            else:
+                                successful_uploads += 1
+
+                        except Exception as e:
+                            failed_uploads.append(f"{file.name}: {str(e)}")
+                    else:
+                        failed_uploads.append(f"{file.name}: not a .parquet file")
+
+                if successful_uploads > 0:
+                    messages.success(request, f"Successfully uploaded {successful_uploads} riboseq files")
+                if failed_uploads:
+                    messages.error(request, f"Failed uploads: {'; '.join(failed_uploads)}")
+
+                return redirect("upload_parquet")
+
+        elif 'bulk_mrna_submit' in request.POST:
+            bulk_mrna_form = BulkMrnaParquetUploadForm(request.POST, request.FILES)
+            if bulk_mrna_form.is_valid():
+                files = request.FILES.getlist('files')
+                successful_uploads = 0
+                failed_uploads = []
+
+                for file in files:
+                    if file.name.endswith('.parquet'):
+                        try:
+                            # Create UploadedMrnaParquet instance
+                            uploaded_file = UploadedMrnaParquet(file=file)
+                            uploaded_file.save()
+
+                            # Validate the file
+                            file_path = uploaded_file.file.path
+                            df = pq.read_table(file_path).to_pandas()
+
+                            required_columns = {"transcript_id", "gene_name", "start_position", "end_position",
+                                              "strand", "read_id", "read_length", "read_count", "region", "source_file"}
+
+                            missing_columns = required_columns - set(df.columns)
+                            if missing_columns:
+                                uploaded_file.delete()  # Remove invalid file
+                                failed_uploads.append(f"{file.name}: missing columns {', '.join(missing_columns)}")
+                            else:
+                                successful_uploads += 1
+
+                        except Exception as e:
+                            failed_uploads.append(f"{file.name}: {str(e)}")
+                    else:
+                        failed_uploads.append(f"{file.name}: not a .parquet file")
+
+                if successful_uploads > 0:
+                    messages.success(request, f"Successfully uploaded {successful_uploads} mRNA files")
+                if failed_uploads:
+                    messages.error(request, f"Failed uploads: {'; '.join(failed_uploads)}")
+
+                return redirect("upload_parquet")
+
+
+
     return render(request, "riboApp/uploadParquet.html", {
         "ribo_form": ribo_form,
-        "mrna_form": mrna_form
+        "mrna_form": mrna_form,
+        "bulk_ribo_form": bulk_ribo_form,
+        "bulk_mrna_form": bulk_mrna_form
     })
+
+def clear_parquet_files(request):
+    """Clear all uploaded parquet files and related data"""
+    if request.method == "POST":
+        try:
+            # Clear database records
+            deleted_parquet = UploadedParquet.objects.all().delete()
+            deleted_mrna = UploadedMrnaParquet.objects.all().delete()
+            print(f"Deleted {deleted_parquet[0]} parquet records and {deleted_mrna[0]} mRNA records")
+
+            # Clear file directories
+            parquet_dir = "media/parquetFiles/"
+            mrna_dir = "media/mrnaFiles/"
+            pickle_dir = "media/parquetPickles/"
+            mrna_pickle_dir = "media/mrnaPickles/"
+
+            cleared_dirs = []
+            # Remove and recreate directories to clear all files
+            for directory in [parquet_dir, mrna_dir, pickle_dir, mrna_pickle_dir]:
+                if os.path.exists(directory):
+                    print(f"Clearing directory: {directory}")
+                    # Remove all files in directory instead of removing directory
+                    for filename in os.listdir(directory):
+                        file_path = os.path.join(directory, filename)
+                        try:
+                            if os.path.isfile(file_path) or os.path.islink(file_path):
+                                os.unlink(file_path)
+                                print(f"Deleted file: {file_path}")
+                            elif os.path.isdir(file_path):
+                                shutil.rmtree(file_path)
+                                print(f"Deleted directory: {file_path}")
+                        except Exception as e:
+                            print(f"Failed to delete {file_path}: {e}")
+                    cleared_dirs.append(directory)
+                else:
+                    print(f"Directory does not exist: {directory}")
+
+            # Clear cache
+            cache.clear()
+            print("Cache cleared")
+
+            messages.success(request, f"All parquet files and related data have been cleared successfully! Cleared directories: {', '.join(cleared_dirs)}")
+
+        except Exception as e:
+            print(f"Error in clear_parquet_files: {str(e)}")
+            messages.error(request, f"Error clearing files: {str(e)}")
+
+    return redirect("upload_parquet")
 
 
 
@@ -445,6 +580,7 @@ import numpy as np
 import plotly.express as px
 from django.shortcuts import render
 from django.core.cache import cache
+import shutil
 
 
 def load_selected_genes():
