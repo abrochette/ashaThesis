@@ -44,7 +44,7 @@
         <div id="save-status" style="color: green; margin-top: 10px;"></div>
 
         <h3>Upload Gene List</h3>
-        <p>Upload a text file with comma-separated gene names to bulk select genes:</p>
+        <p>Upload a text file with gene names separated by commas or newlines to bulk select genes:</p>
         <input type="file" id="gene-file-input" accept=".txt,.csv" style="margin-bottom: 10px;">
         <button id="upload-genes-button" style="background-color: #28a745; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px;">
             Load Genes from File
@@ -165,8 +165,17 @@ document.addEventListener("DOMContentLoaded", function () {
         const reader = new FileReader();
         reader.onload = function(e) {
             const content = e.target.result;
-            // Split by commas and clean up whitespace
-            const genesFromFile = content.split(',').map(gene => gene.trim()).filter(gene => gene.length > 0);
+            // Split by both newlines and commas, then clean up whitespace
+            let genesFromFile = [];
+
+            // First split by newlines
+            const lines = content.split(/\r?\n/);
+
+            // Then split each line by commas
+            lines.forEach(line => {
+                const genesInLine = line.split(',').map(gene => gene.trim()).filter(gene => gene.length > 0);
+                genesFromFile = genesFromFile.concat(genesInLine);
+            });
 
             if (genesFromFile.length === 0) {
                 document.getElementById("upload-status").innerText = "No valid genes found in file.";

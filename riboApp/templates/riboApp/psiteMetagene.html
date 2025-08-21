@@ -21,7 +21,7 @@
 
 <form method="POST">
     {% csrf_token %}
-    
+
     <h3>Select Riboseq Files for Analysis:</h3>
     <div style="margin: 20px 0;">
         {% for file in parquet_files %}
@@ -33,7 +33,54 @@
             <p style="color: red;">No parquet files found. Please upload riboseq files first.</p>
         {% endfor %}
     </div>
-    
+
+    <h3>Gene Selection Options:</h3>
+    <div style="margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+        <div style="margin: 10px 0;">
+            <input type="checkbox" name="use_selected_genes" id="use_selected_genes">
+            <label for="use_selected_genes">
+                <strong>Use Selected Genes Only</strong>
+                {% if selected_genes_count > 0 %}
+                    ({{ selected_genes_count }} genes selected)
+                {% else %}
+                    (No genes selected)
+                {% endif %}
+            </label>
+        </div>
+
+        {% if selected_genes_count > 0 %}
+            <div style="margin: 10px 0; font-size: 0.9em; color: #666;">
+                <strong>Selected genes:</strong>
+                {% for gene in selected_genes|slice:":10" %}
+                    {{ gene }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+                {% if selected_genes_count > 10 %}
+                    ... and {{ selected_genes_count|add:"-10" }} more
+                {% endif %}
+            </div>
+        {% else %}
+            <div style="margin: 10px 0; font-size: 0.9em; color: #666;">
+                To select genes, use the <a href="{% url 'combined_geneCounts' %}">Gene Counts Analysis</a>
+                or <a href="{% url 'geneCounts' %}">Single File Gene Counts</a> pages to click on genes and save your selection.
+                <br><br>
+                <strong>Or upload a gene list file here:</strong>
+            </div>
+
+            <div style="margin: 10px 0;">
+                <input type="file" id="gene-file-input" accept=".txt,.csv" style="margin-bottom: 5px;">
+                <button type="button" id="upload-genes-button" style="background-color: #28a745; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px;">
+                    Load Genes from File
+                </button>
+                <div id="upload-status" style="color: blue; margin-top: 5px; font-size: 12px;"></div>
+            </div>
+        {% endif %}
+
+        <div style="margin: 10px 0; font-size: 0.9em; color: #666;">
+            <strong>Note:</strong> When using selected genes, all selected genes will be combined into a single line per experiment,
+            showing the sum of ribosome coverage across all selected genes.
+        </div>
+    </div>
+
     <button type="submit" style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
         Generate P-site Metagene Plots
     </button>
@@ -83,7 +130,13 @@
             <li><strong>Data Processing:</strong> Used CDS regions with read lengths 28-32 nucleotides</li>
             <li><strong>P-site Correction:</strong> Applied experiment-specific P-site offsets</li>
             <li><strong>Normalization:</strong> Counts normalized to reads per million (RPM)</li>
-            <li><strong>Colors:</strong> Each experiment is shown in a different color (steelblue, violetred, darkviolet, turquoise)</li>
+            {% if selected_genes_count > 0 %}
+                <li><strong>Gene Selection:</strong> Analysis limited to {{ selected_genes_count }} selected genes, combined into single lines</li>
+                <li><strong>Aggregation:</strong> Selected genes' counts are summed (not averaged) for each position</li>
+            {% else %}
+                <li><strong>Gene Selection:</strong> Analysis includes all genes in the dataset, averaged across genes</li>
+            {% endif %}
+            <li><strong>Colors:</strong> Each experiment is shown in a different color (steelblue, mediumvioletred, darkviolet, turquoise)</li>
         </ul>
     </div>
 {% endif %}
@@ -107,3 +160,69 @@
 </div>
 
 {% endblock %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    // Handle gene file upload
+    document.getElementById("upload-genes-button")?.addEventListener("click", function () {
+        const fileInput = document.getElementById("gene-file-input");
+        const file = fileInput.files[0];
+
+        if (!file) {
+            document.getElementById("upload-status").innerText = "Please select a file first.";
+            document.getElementById("upload-status").style.color = "red";
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const content = e.target.result;
+            // Split by both newlines and commas, then clean up whitespace
+            let genesFromFile = [];
+
+            // First split by newlines
+            const lines = content.split(/\r?\n/);
+
+            // Then split each line by commas
+            lines.forEach(line => {
+                const genesInLine = line.split(',').map(gene => gene.trim()).filter(gene => gene.length > 0);
+                genesFromFile = genesFromFile.concat(genesInLine);
+            });
+
+            if (genesFromFile.length === 0) {
+                document.getElementById("upload-status").innerText = "No valid genes found in file.";
+                document.getElementById("upload-status").style.color = "red";
+                return;
+            }
+
+            // Send genes to Django to save them
+            fetch("/save_selected_genes/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}"
+                },
+                body: JSON.stringify({ "genes": genesFromFile })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("upload-status").innerText = `Successfully loaded ${genesFromFile.length} genes. Please refresh the page to see them.`;
+                document.getElementById("upload-status").style.color = "green";
+                console.log("Loaded genes from file:", genesFromFile);
+            })
+            .catch(error => {
+                document.getElementById("upload-status").innerText = "Error saving genes to database.";
+                document.getElementById("upload-status").style.color = "red";
+                console.error("Error saving genes:", error);
+            });
+        };
+
+        reader.onerror = function() {
+            document.getElementById("upload-status").innerText = "Error reading file.";
+            document.getElementById("upload-status").style.color = "red";
+        };
+
+        reader.readAsText(file);
+    });
+});
+</script>

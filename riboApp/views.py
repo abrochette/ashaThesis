@@ -1161,30 +1161,37 @@ def process_ribo_files(request):
 def psite_metagene_plots(request):
     """Generate P-site offset metagene plots for parquet files"""
     parquet_files = get_available_parquet_files()
+    selected_genes = load_selected_genes()
     start_plot = None
     stop_plot = None
     error_message = None
 
     if request.method == "POST":
         selected_files = request.POST.getlist("selected_files")
+        use_selected_genes = request.POST.get("use_selected_genes") == "on"
 
         if not selected_files:
             error_message = "Please select at least one file."
+        elif use_selected_genes and not selected_genes:
+            error_message = "No genes selected. Please select genes first or uncheck 'Use Selected Genes Only'."
         else:
             try:
                 # Generate metagene plots
-                start_plot, stop_plot = generate_psite_metagene_plots(selected_files)
+                genes_to_use = selected_genes if use_selected_genes else None
+                start_plot, stop_plot = generate_psite_metagene_plots(selected_files, genes_to_use)
             except Exception as e:
                 error_message = f"Error generating plots: {str(e)}"
 
     return render(request, "riboApp/psiteMetagene.html", {
         "parquet_files": parquet_files,
+        "selected_genes": selected_genes,
+        "selected_genes_count": len(selected_genes),
         "start_plot": start_plot,
         "stop_plot": stop_plot,
         "error_message": error_message,
     })
 
-def generate_psite_metagene_plots(selected_files):
+def generate_psite_metagene_plots(selected_files, selected_genes=None):
     """Generate start and stop codon metagene plots with P-site offsets"""
 
     # Load P-site offsets
@@ -1224,12 +1231,12 @@ def generate_psite_metagene_plots(selected_files):
         total_reads = df["read_count"].sum()
 
         # Process start codon data (positions around start codon)
-        start_data = process_metagene_data(df, file_offsets, file_basename, total_reads, "start")
+        start_data = process_metagene_data(df, file_offsets, file_basename, total_reads, "start", selected_genes)
         if not start_data.empty:
             all_start_data.append(start_data)
 
         # Process stop codon data (positions around stop codon)
-        stop_data = process_metagene_data(df, file_offsets, file_basename, total_reads, "stop")
+        stop_data = process_metagene_data(df, file_offsets, file_basename, total_reads, "stop", selected_genes)
         if not stop_data.empty:
             all_stop_data.append(stop_data)
 
@@ -1261,8 +1268,14 @@ def generate_psite_metagene_plots(selected_files):
 
     return start_plot_html, stop_plot_html
 
-def process_metagene_data(df, file_offsets, experiment_name, total_reads, site_type):
+def process_metagene_data(df, file_offsets, experiment_name, total_reads, site_type, selected_genes=None):
     """Process parquet data to create metagene coverage around start/stop codons"""
+
+    # Filter by selected genes if provided
+    if selected_genes:
+        df = df[df["gene_name"].isin(selected_genes)]
+        if df.empty:
+            return pd.DataFrame()
 
     # Create offset mapping
     length_to_offset = dict(zip(file_offsets["read_length"], file_offsets["P_site_offset"]))
@@ -1330,8 +1343,15 @@ def process_metagene_data(df, file_offsets, experiment_name, total_reads, site_t
     # Convert to DataFrame and aggregate across genes for each experiment
     metagene_df = pd.DataFrame(metagene_data)
 
-    # Average across all genes for each position and experiment
-    result = metagene_df.groupby(["shifted_position", "experiment"], as_index=False)["avg_count"].mean()
+    if selected_genes:
+        # When using selected genes, combine all genes into a single line per experiment
+        # Sum the counts across all selected genes for each position
+        result = metagene_df.groupby(["shifted_position", "experiment"], as_index=False)["avg_count"].sum()
+        # Add a label to indicate this is selected genes
+        result["experiment"] = result["experiment"] + " (Selected Genes)"
+    else:
+        # Average across all genes for each position and experiment (original behavior)
+        result = metagene_df.groupby(["shifted_position", "experiment"], as_index=False)["avg_count"].mean()
 
     return result
 
@@ -1341,8 +1361,8 @@ def create_metagene_plot(data, title, xlim=None, ylim=None):
     if data.empty:
         return "<p>No data available for plotting</p>"
 
-    # Define custom colors (matching the R script)
-    custom_colors = ["steelblue", "violetred", "darkviolet", "turquoise"]
+    # Define custom colors (using valid CSS color names)
+    custom_colors = ["steelblue", "mediumvioletred", "darkviolet", "turquoise"]
 
     fig = px.line(
         data,
