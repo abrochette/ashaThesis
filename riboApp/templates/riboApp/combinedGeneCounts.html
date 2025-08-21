@@ -2,80 +2,89 @@
 
 {% block content %}
 
-<h1>Gene Scatter Plot</h1>
+<h1>Combined Gene Scatter Plot (Riboseq vs mRNA)</h1>
 
 <form method="POST">
     {% csrf_token %}
 
-    <label for="file1">Select File for X-Axis:</label>
-    <select name="file1" id="file1">
-        <option value="">-- Select a file --</option>
-        {% for file in parquet_files %}
-            <option value="{{ file }}">{{ file }}</option>
+    <label for="ribo_file">Select Riboseq File for X-Axis:</label>
+    <select name="ribo_file" id="ribo_file">
+        <option value="">-- Select a riboseq file --</option>
+        {% for file in ribo_files %}
+            <option value="{{ file }}" {% if file == ribo_file %}selected{% endif %}>{{ file }}</option>
         {% endfor %}
     </select>
 
-    <label for="file2">Select File for Y-Axis:</label>
-    <select name="file2" id="file2">
-        <option value="">-- Select a file --</option>
-        {% for file in parquet_files %}
-            <option value="{{ file }}">{{ file }}</option>
+    <label for="mrna_file">Select mRNA File for Y-Axis:</label>
+    <select name="mrna_file" id="mrna_file">
+        <option value="">-- Select an mRNA file --</option>
+        {% for file in mrna_files %}
+            <option value="{{ file }}" {% if file == mrna_file %}selected{% endif %}>{{ file }}</option>
         {% endfor %}
     </select>
 
-    <button type="submit">Generate Plot</button>
+    <button type="submit">Generate Combined Plot</button>
 </form>
 
-<div id="plot-container">
-    {% if plot_div %}
-        <div>{{ plot_div|safe }}</div>  <!-- Render Plotly figure -->
-    {% else %}
-        <p>No plot generated yet.</p>
-    {% endif %}
-</div>
+<hr>
 
-{% if plot_div %}  {# Only show this section if a plot is generated #}
-<div id="clicked-genes-section">
-    <h3>Clicked Genes</h3>
-    <textarea id="clicked-genes" style="width:100%; height:100px;" readonly></textarea>
-    <button id="save-button">Save Selected Genes</button>
-    <button id="clear-button" style="margin-left: 10px; background-color: red; color: white; border: none; padding: 5px 10px; cursor: pointer;">
-        Clear Selection
-    </button>
-    <div id="save-status" style="color: green; margin-top: 10px;"></div>
+{% if plot_div %}
+    <h2>Combined Gene Count Comparison</h2>
+    <div id="plot-container">
+        {{ plot_div|safe }}
+    </div>
 
-    <h3>Upload Gene List</h3>
-    <p>Upload a text file with comma-separated gene names to bulk select genes:</p>
-    <input type="file" id="gene-file-input" accept=".txt,.csv" style="margin-bottom: 10px;">
-    <button id="upload-genes-button" style="background-color: #28a745; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px;">
-        Load Genes from File
-    </button>
-    <div id="upload-status" style="color: blue; margin-top: 5px; font-size: 14px;"></div>
+    <div id="clicked-genes-section" style="margin-top: 20px;">
+        <h3>Clicked Genes</h3>
+        <textarea id="clicked-genes" style="width:100%; height:100px;" readonly></textarea>
+        <button id="save-button">Save Selected Genes</button>
+        <button id="clear-button" style="margin-left: 10px; background-color: red; color: white; border: none; padding: 5px 10px; cursor: pointer;">
+            Clear Selection
+        </button>
+        <div id="save-status" style="color: green; margin-top: 10px;"></div>
 
-    <h3>Selected Genes:</h3>
-    <ul id="selected-genes-list">
-        {% for gene in selected_genes %}
-            <li>{{ gene.gene_name }}</li>
-        {% empty %}
-            <li>No genes selected.</li>
-        {% endfor %}
-    </ul>
-</div>
+        <h3>Upload Gene List</h3>
+        <p>Upload a text file with comma-separated gene names to bulk select genes:</p>
+        <input type="file" id="gene-file-input" accept=".txt,.csv" style="margin-bottom: 10px;">
+        <button id="upload-genes-button" style="background-color: #28a745; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px;">
+            Load Genes from File
+        </button>
+        <div id="upload-status" style="color: blue; margin-top: 5px; font-size: 14px;"></div>
 
-<div id="bin-count-links" style="margin-top: 20px;">
-    <h3>View Bin Counts for Selected Files</h3>
-    {% if file1 %}
-        <a href="{% url 'binCounts' %}?selected_file={{ file1 }}" class="btn btn-primary" style="margin-right: 10px;">
-            Bin Counts for {{ file1 }}
-        </a>
-    {% endif %}
-    {% if file2 %}
-        <a href="{% url 'binCounts' %}?selected_file={{ file2 }}" class="btn btn-primary">
-            Bin Counts for {{ file2 }}
-        </a>
-    {% endif %}
-</div>
-{% endif %}  {# End conditional block #}
+        <h3>Selected Genes:</h3>
+        <ul id="selected-genes-list">
+            {% for gene in selected_genes %}
+                <li>{{ gene.gene_name }}</li>
+            {% empty %}
+                <li>No genes selected.</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div id="bin-count-links" style="margin-top: 20px;">
+        <h3>View Bin Counts for Selected Riboseq File</h3>
+        {% if ribo_file %}
+            <a href="{% url 'binCounts' %}?selected_file={{ ribo_file }}" class="btn btn-primary">
+                Bin Counts for {{ ribo_file }}
+            </a>
+            <p style="margin-top: 10px; color: #666; font-size: 14px;">
+                <em>Note: Bin count analysis is only available for riboseq data since mRNA data doesn't contain P-site positioning information.</em>
+            </p>
+        {% endif %}
+    </div>
+{% endif %}
+
+<hr>
+
+<h3>Currently Selected Genes for Analysis</h3>
+<p>The following genes are currently selected for analysis:</p>
+<ul>
+    {% for gene in selected_genes %}
+        <li>{{ gene.gene_name }}</li>
+    {% empty %}
+        <li>No genes selected. Click on points in the plot above to select genes.</li>
+    {% endfor %}
+</ul>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
@@ -104,7 +113,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     attachClickListener();
 
-    // ✅ Send selected genes to Django when "Save" is clicked
+    // Send selected genes to Django when "Save" is clicked
     document.getElementById("save-button")?.addEventListener("click", function () {
         fetch("/save_selected_genes/", {
             method: "POST",
@@ -122,24 +131,24 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     document.getElementById("clear-button")?.addEventListener("click", function () {
-    selectedGenes = []; // Reset the array
-    document.getElementById("clicked-genes").value = ""; // Clear textarea
-    document.getElementById("save-status").innerText = "Selection cleared.";
-    updateGeneList();
+        selectedGenes = []; // Reset the array
+        document.getElementById("clicked-genes").value = ""; // Clear textarea
+        document.getElementById("save-status").innerText = "Selection cleared.";
+        updateGeneList();
 
-    fetch("/save_selected_genes/", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": "{{ csrf_token }}"
-        },
-        body: JSON.stringify({ "genes": [] }) // Send empty array to trigger database reset
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log("django Response after clearing database:", data);
-    })
-    .catch(error => console.error("Error clearing database:", error));
+        fetch("/save_selected_genes/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}"
+            },
+            body: JSON.stringify({ "genes": [] }) // Send empty array to trigger database reset
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("Django Response after clearing database:", data);
+        })
+        .catch(error => console.error("Error clearing database:", error));
     });
 
     // Handle gene file upload

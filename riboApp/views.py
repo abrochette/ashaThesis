@@ -4,7 +4,7 @@ from .models import ProcessingInput
 from .forms import CreateNewList
 import mimetypes
 import yaml
-from .forms import ParquetUploadForm
+from .forms import ParquetUploadForm, MrnaParquetUploadForm
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
 import json
@@ -23,7 +23,7 @@ import pandas as pd
 import os
 from django.shortcuts import render, redirect
 import pyarrow.parquet as pq
-from .models import SelectedGene
+from .models import SelectedGene, UploadedMrnaParquet
 
 
 
@@ -203,37 +203,69 @@ def get_gene_reads(gene_name):
     return pd.concat(all_data, ignore_index=True)
 # Upload and store all Parquet data
 def upload_parquet(request):
+    ribo_form = ParquetUploadForm()
+    mrna_form = MrnaParquetUploadForm()
+
     if request.method == "POST":
-        form = ParquetUploadForm(request.POST, request.FILES)
-        if form.is_valid():
-            uploaded_file = form.save()  # Saves file path in DB
+        # Check which form was submitted
+        if 'ribo_submit' in request.POST:
+            ribo_form = ParquetUploadForm(request.POST, request.FILES)
+            if ribo_form.is_valid():
+                uploaded_file = ribo_form.save()  # Saves file path in DB
+                file_path = uploaded_file.file.path  # Full file path
 
-            file_path = uploaded_file.file.path  # Full file path
+                # Check if the file is valid
+                try:
+                    df = pq.read_table(file_path).to_pandas()  # Load with PyArrow for speed
 
-            # Check if the file is valid
-            try:
-                df = pq.read_table(file_path).to_pandas()  # Load with PyArrow for speed
+                    # Ensure required columns exist
+                    required_columns = {"transcript_id", "gene_name", "start_position", "end_position",
+                                        "strand", "read_id", "read_length", "read_count", "region", "source_file"}
 
-                # Ensure required columns exist
-                required_columns = {"transcript_id", "gene_name", "start_position", "end_position",
-                                    "strand", "read_id", "read_length", "read_count", "region", "source_file"}
+                    missing_columns = required_columns - set(df.columns)
+                    if missing_columns:
+                        messages.error(request, f"Riboseq file missing columns: {', '.join(missing_columns)}")
+                        return redirect("upload_parquet")
 
-                missing_columns = required_columns - set(df.columns)
-                if missing_columns:
-                    messages.error(request, f"Skipping missing columns: {', '.join(missing_columns)}")
+                except Exception as e:
+                    messages.error(request, f"Invalid Riboseq Parquet file: {str(e)}")
                     return redirect("upload_parquet")
 
-            except Exception as e:
-                messages.error(request, f"Invalid Parquet file: {str(e)}")
+                messages.success(request, f"Riboseq file uploaded successfully: {uploaded_file.file.name}")
                 return redirect("upload_parquet")
 
-            messages.success(request, f"File uploaded successfully: {uploaded_file.file.name}")
-            return redirect("upload_parquet")
+        elif 'mrna_submit' in request.POST:
+            mrna_form = MrnaParquetUploadForm(request.POST, request.FILES)
+            if mrna_form.is_valid():
+                uploaded_file = mrna_form.save()  # Saves file path in DB
+                file_path = uploaded_file.file.path  # Full file path
 
-    else:
-        form = ParquetUploadForm()
+                # Check if the file is valid
+                try:
+                    df = pq.read_table(file_path).to_pandas()  # Load with PyArrow for speed
 
-    return render(request, "riboApp/uploadParquet.html", {"form": form})
+                    # Ensure required columns exist (same as riboseq for consistency)
+                    required_columns = {"transcript_id", "gene_name", "start_position", "end_position",
+                                        "strand", "read_id", "read_length", "read_count", "region", "source_file"}
+
+                    missing_columns = required_columns - set(df.columns)
+                    if missing_columns:
+                        messages.error(request, f"mRNA file missing columns: {', '.join(missing_columns)}")
+                        return redirect("upload_parquet")
+
+                except Exception as e:
+                    messages.error(request, f"Invalid mRNA Parquet file: {str(e)}")
+                    return redirect("upload_parquet")
+
+                messages.success(request, f"mRNA file uploaded successfully: {uploaded_file.file.name}")
+                return redirect("upload_parquet")
+
+    return render(request, "riboApp/uploadParquet.html", {
+        "ribo_form": ribo_form,
+        "mrna_form": mrna_form
+    })
+
+
 
 
 
@@ -388,9 +420,19 @@ def get_available_parquet_files():
     print(f"Available Parquet Files: {files}")  # Debugging
     return files
 
+# Function to list available mRNA Parquet files
+def get_available_mrna_files():
+    mrna_folder = "media/mrnaFiles/"
+    if not os.path.exists(mrna_folder):
+        return []
+    files = [f for f in os.listdir(mrna_folder) if f.endswith(".parquet")]
+    print(f"Available mRNA Files: {files}")  # Debugging
+    return files
+
 
 # File Paths (Adjust as Needed)
 PARQUET_FOLDER = "media/parquetFiles/"
+MRNA_FOLDER = "media/mrnaFiles/"
 OFFSET_CSV = "media/uorf_psite_offset.csv"
 NBINS = 4
 SKIP_5PRIME = 45
@@ -411,6 +453,11 @@ def load_selected_genes():
 
 def get_available_parquet_files():
     return [f for f in os.listdir(PARQUET_FOLDER) if f.endswith(".parquet")]
+
+def get_available_mrna_parquet_files():
+    if not os.path.exists(MRNA_FOLDER):
+        return []
+    return [f for f in os.listdir(MRNA_FOLDER) if f.endswith(".parquet")]
 
 def get_bin_counts(selected_file):
     selected_genes = load_selected_genes()
@@ -529,6 +576,44 @@ def get_bin_counts(selected_file):
     return plot_html, None
 
 
+
+def combined_geneCounts(request):
+    """Combined gene counts view for riboseq and mRNA files"""
+    selected_genes = SelectedGene.objects.all()
+    ribo_files = get_available_parquet_files()
+    mrna_files = get_available_mrna_parquet_files()
+    plot_div = None
+    ribo_file = None
+    mrna_file = None
+
+    if request.method == "POST":
+        ribo_file = request.POST.get("ribo_file")
+        mrna_file = request.POST.get("mrna_file")
+        if ribo_file and mrna_file:
+            df = get_combined_gene_counts(ribo_file, mrna_file)
+            print(f"Generating combined scatter plot for {ribo_file} (Ribo) vs {mrna_file} (mRNA)")
+            fig = px.scatter(
+                df,
+                x="ribo_count",
+                y="mrna_count",
+                hover_name="gene_name",
+                title=f"Gene Read Counts: {ribo_file} (Ribo) vs {mrna_file} (mRNA)",
+                labels={"ribo_count": f"Riboseq: {ribo_file}", "mrna_count": f"mRNA: {mrna_file}"},
+            )
+            plot_div = fig.to_html(full_html=False)
+
+    return render(request, "riboApp/combinedGeneCounts.html", {
+        "selected_genes": selected_genes,
+        "ribo_files": ribo_files,
+        "mrna_files": mrna_files,
+        "plot_div": plot_div,
+        "ribo_file": ribo_file,
+        "mrna_file": mrna_file,
+    })
+
+
+
+
 def bin_counts_view(request):
     parquet_files = get_available_parquet_files()
     plots = None
@@ -590,6 +675,60 @@ def process_parquet_file_gene_counts(file_path):
     gene_counts = df.groupby("gene_name", as_index=False)["read_count"].sum()
     gene_counts["file_name"] = os.path.basename(file_path)
     return gene_counts
+
+def process_mrna_file_gene_counts(file_path):
+    """Process mRNA parquet file for gene counts - same logic as riboseq"""
+    df = pd.read_parquet(file_path)
+    if "gene_name" not in df.columns or "read_count" not in df.columns:
+        raise ValueError(f"Missing required columns in {file_path}")
+    gene_counts = df.groupby("gene_name", as_index=False)["read_count"].sum()
+    gene_counts["file_name"] = os.path.basename(file_path)
+    return gene_counts
+
+def get_mrna_gene_counts_dict(mrna_filename):
+    """Get or create gene counts dictionary for mRNA file with caching"""
+    mrna_path = os.path.join(MRNA_FOLDER, mrna_filename)
+    pickle_path = f"media/mrnaPickles/{mrna_filename.replace('.parquet', '.pkl')}"
+
+    if os.path.exists(pickle_path):
+        print(f"Loading cached mRNA gene counts: {pickle_path}")
+        with open(pickle_path, "rb") as f:
+            return pickle.load(f)
+
+    print(f"⏳ Building gene_counts_dict for mRNA {mrna_filename} ...")
+    gene_counts = {}
+    pq_file = pq.ParquetFile(mrna_path)
+    for batch in pq_file.iter_batches(batch_size=100000, columns=["gene_name", "read_count"]):
+        df_chunk = batch.to_pandas()
+        for _, row in df_chunk.iterrows():
+            gene = row["gene_name"]
+            count = row["read_count"]
+            gene_counts[gene] = gene_counts.get(gene, 0) + count
+
+    with open(pickle_path, "wb") as f:
+        pickle.dump(gene_counts, f)
+        print(f"Saved mRNA pickle: {pickle_path}")
+    return gene_counts
+
+def get_combined_gene_counts(ribo_file, mrna_file):
+    """Get combined gene counts from riboseq and mRNA files for comparison"""
+    ribo_counts = load_or_build_gene_counts_dict(ribo_file)
+    mrna_counts = get_mrna_gene_counts_dict(mrna_file)
+
+    # Get all unique genes from both datasets
+    all_genes = set(ribo_counts.keys()) | set(mrna_counts.keys())
+
+    combined_data = []
+    for gene in all_genes:
+        ribo_count = ribo_counts.get(gene, 0)
+        mrna_count = mrna_counts.get(gene, 0)
+        combined_data.append({
+            "gene_name": gene,
+            "ribo_count": ribo_count,
+            "mrna_count": mrna_count
+        })
+
+    return pd.DataFrame(combined_data)
 
 
 import hashlib
@@ -718,6 +857,116 @@ def pca_gene_counts(request):
     cache.set(cache_key, pca_plot_json, timeout=None)
     print("Stored PCA plot in cache.")
     return render(request, "riboApp/pca_plot.html", {"pca_plot": pca_plot_html})
+
+def combined_pca_gene_counts(request):
+    """Combined PCA analysis for riboseq and mRNA files"""
+
+    if not os.path.exists(GTF_FILE):
+        return render(request, "riboApp/error.html", {"error_message": "GTF file not found!"})
+
+    # Build cache key for combined analysis
+    ribo_files = sorted([
+        os.path.basename(f) for f in glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet"))
+        if not os.path.basename(f).startswith(".")
+    ])
+    mrna_files = sorted([
+        os.path.basename(f) for f in glob.glob(os.path.join(MRNA_FOLDER, "*.parquet"))
+        if not os.path.basename(f).startswith(".")
+    ])
+
+    all_files = ribo_files + mrna_files
+    if not all_files:
+        return render(request, "riboApp/error.html", {"error_message": "No Parquet files found!"})
+
+    cache_key = f"combined_pca_{'_'.join(all_files)}"
+    hashed_key = hashlib.md5(cache_key.encode()).hexdigest()
+    cache_key = f"combined_pca_{hashed_key}"
+
+    cached_plot_json = cache.get(cache_key)
+    if cached_plot_json is not None:
+        print("Loaded combined PCA plot from cache.")
+        fig = pio.from_json(cached_plot_json)
+        pca_plot_html = fig.to_html(full_html=False)
+        return render(request, "riboApp/combinedPca.html", {"pca_plot": pca_plot_html})
+
+    print("Combined PCA plot NOT found in cache. Recomputing...")
+
+    gene_lengths = calculate_gene_lengths(GTF_FILE)
+    if gene_lengths.empty:
+        return render(request, "riboApp/error.html", {"error_message": "No gene lengths extracted from GTF!"})
+
+    # Load all Riboseq files
+    all_counts = []
+    ribo_parquet_files = glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet"))
+    for file in ribo_parquet_files:
+        df_counts = process_parquet_file_gene_counts(file)
+        df_counts["file_type"] = "Riboseq"
+        all_counts.append(df_counts)
+
+    # Load all mRNA files
+    mrna_parquet_files = glob.glob(os.path.join(MRNA_FOLDER, "*.parquet"))
+    for file in mrna_parquet_files:
+        df_counts = process_mrna_file_gene_counts(file)
+        df_counts["file_type"] = "mRNA"
+        all_counts.append(df_counts)
+
+    if not all_counts:
+        return render(request, "riboApp/error.html", {"error_message": "No valid files found!"})
+
+    gene_counts_df = pd.concat(all_counts, ignore_index=True)
+
+    # Ensure gene names match in format
+    gene_counts_df["gene_name"] = gene_counts_df["gene_name"].str.strip().str.lower()
+    gene_lengths["gene_name"] = gene_lengths["gene_name"].str.strip().str.lower()
+
+    # Merge with gene lengths
+    gene_counts_df = pd.merge(gene_counts_df, gene_lengths, on="gene_name", how="left")
+    gene_counts_df.dropna(subset=["length_kb"], inplace=True)
+    gene_counts_df["length_kb"] = pd.to_numeric(gene_counts_df["length_kb"], errors="coerce")
+
+    # Create a combined file identifier with type
+    gene_counts_df["file_id"] = gene_counts_df["file_type"] + "_" + gene_counts_df["file_name"]
+
+    # Pivot the DataFrame so that each file's gene counts are a separate column
+    pivot_df = gene_counts_df.pivot_table(index="gene_name", columns="file_id", values="read_count", fill_value=0).reset_index()
+    pivot_df = pivot_df.merge(gene_counts_df[["gene_name", "length_kb"]].drop_duplicates(), on="gene_name", how="left")
+    pivot_df["length_kb"] = pd.to_numeric(pivot_df["length_kb"], errors="coerce")
+
+    if pivot_df.empty:
+        return render(request, "riboApp/error.html", {"error_message": "No valid gene count data after pivoting!"})
+
+    # RPKM Normalization
+    sample_cols = [col for col in pivot_df.columns if col not in ("gene_name", "length_kb")]
+    for col in sample_cols:
+        pivot_df[col] = (pivot_df[col] / pivot_df["length_kb"]) * 1e6 / pivot_df[col].sum()
+
+    # Perform PCA
+    pca = PCA(n_components=2)
+    pca_results = pca.fit_transform(pivot_df[sample_cols].T)
+
+    # Create PCA dataframe with file type information
+    pca_df = pd.DataFrame({
+        "PC1": pca_results[:, 0],
+        "PC2": pca_results[:, 1],
+        "file": sample_cols
+    })
+    pca_df["file_type"] = pca_df["file"].apply(lambda x: x.split("_")[0])
+
+    # Generate the interactive PCA plot with color coding by file type
+    fig = px.scatter(
+        pca_df, x="PC1", y="PC2", text="file", color="file_type",
+        title="Combined PCA of Gene Counts (RPKM Normalized): Riboseq vs mRNA",
+        color_discrete_map={"Riboseq": "#1f77b4", "mRNA": "#ff7f0e"}
+    )
+    fig.update_traces(textposition="top center")
+    pca_plot_html = fig.to_html(full_html=False)
+
+    # Cache the result
+    pca_plot_json = fig.to_json()
+    cache.set(cache_key, pca_plot_json, timeout=None)
+    print("Stored combined PCA plot in cache.")
+
+    return render(request, "riboApp/combinedPca.html", {"pca_plot": pca_plot_html})
 
 
 import os

@@ -2,7 +2,7 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-    <h2>Upload Parquet File</h2>
+    <h2>Upload Riboseq Parquet File</h2>
 
     {% if messages %}
         {% for message in messages %}
@@ -14,16 +14,26 @@
 
     <form method="post" enctype="multipart/form-data" class="form-group">
         {% csrf_token %}
-        {{ form|crispy }}  <!-- Use Crispy Forms -->
-        <button type="submit" class="btn btn-primary">Upload</button>
+        {{ ribo_form|crispy }}  <!-- Use Crispy Forms -->
+        <button type="submit" name="ribo_submit" class="btn btn-primary">Upload Riboseq File</button>
     </form>
 
     <hr>
 
-    <h3>Analysis Options</h3>
-    <p>Select an analysis type to proceed:</p>
+    <h2>Upload mRNA Parquet File</h2>
 
-    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+    <form method="post" enctype="multipart/form-data" class="form-group">
+        {% csrf_token %}
+        {{ mrna_form|crispy }}  <!-- Use Crispy Forms -->
+        <button type="submit" name="mrna_submit" class="btn" style="background-color: #ff7f0e; color: white;">Upload mRNA File</button>
+    </form>
+
+    <hr>
+
+    <h3>Riboseq-Only Analysis Options</h3>
+    <p>Analyze riboseq data independently:</p>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
         <a href="{% url 'geneCounts' %}">
             <button style="padding: 10px; background-color: #368BC1; color: white; border: none; border-radius: 5px; cursor: pointer;">
                 Gene Counts
@@ -41,7 +51,27 @@
                 PCA Analysis
             </button>
         </a>
+    </div>
 
+    <h3>Combined Analysis Options (Riboseq + mRNA)</h3>
+    <p>Compare riboseq and mRNA data together:</p>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+        <a href="{% url 'combined_geneCounts' %}">
+            <button style="padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                Combined Gene Counts
+            </button>
+        </a>
+
+        <a href="{% url 'combined_pca_plot' %}">
+            <button style="padding: 10px; background-color: #6f42c1; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                Combined PCA Analysis
+            </button>
+        </a>
+    </div>
+
+    <div style="background-color: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 15px; border-left: 4px solid #ffc107;">
+        <small><strong>Note:</strong> Bin count analysis is only available for riboseq data since mRNA data doesn't contain P-site positioning information required for ribosome occupancy mapping.</small>
     </div>
 
 {% endblock %}

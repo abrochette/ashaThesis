@@ -20,6 +20,9 @@ urlpatterns = [
     path("binCounts/", views.bin_counts_view, name="binCounts"),
     path("pca/", views.pca_gene_counts, name="pca_plot"),
     path("coverageGraphs/", views.process_ribo_files, name="coverageGraphs"),
+    # mRNA analysis URLs
+    path("combined_geneCounts/", views.combined_geneCounts, name="combined_geneCounts"),
+    path("combined_pca/", views.combined_pca_gene_counts, name="combined_pca_plot"),
 ]
 
 if settings.DEBUG:

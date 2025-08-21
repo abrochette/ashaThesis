@@ -1,6 +1,6 @@
 from django import forms
 
-from riboApp.models import UploadedParquet
+from riboApp.models import UploadedParquet, UploadedMrnaParquet
 
 
 class CreateNewList(forms.Form):
@@ -14,6 +14,11 @@ class CreateNewList(forms.Form):
 class ParquetUploadForm(forms.ModelForm):
     class Meta:
         model = UploadedParquet
+        fields = ["file"]
+
+class MrnaParquetUploadForm(forms.ModelForm):
+    class Meta:
+        model = UploadedMrnaParquet
         fields = ["file"]
 
 

@@ -1,0 +1,66 @@
+{% extends 'riboApp/base.html' %}
+
+{% block content %}
+
+<h1>Combined PCA Analysis (Riboseq vs mRNA)</h1>
+
+<div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px; margin: 20px 0;">
+    <h3>About This Analysis:</h3>
+    <p>
+        This PCA plot combines both riboseq and mRNA data to show the relationships between samples.
+        Each point represents a file, with colors distinguishing between:
+    </p>
+    <ul>
+        <li><strong style="color: #1f77b4;">Blue points:</strong> Riboseq files</li>
+        <li><strong style="color: #ff7f0e;">Orange points:</strong> mRNA files</li>
+    </ul>
+    <p>
+        The analysis uses RPKM-normalized gene counts to ensure fair comparison between different data types.
+        Clustering patterns can reveal:
+    </p>
+    <ul>
+        <li>Sample relationships and batch effects</li>
+        <li>Differences between riboseq and mRNA expression patterns</li>
+        <li>Outlier samples that may need further investigation</li>
+    </ul>
+</div>
+
+<hr>
+
+{% if pca_plot %}
+    <div>
+        {{ pca_plot|safe }}
+    </div>
+{% else %}
+    <p>No PCA plot available. Please ensure both riboseq and mRNA files are uploaded.</p>
+{% endif %}
+
+<hr>
+
+<h3>Interpretation Guide:</h3>
+<div style="background-color: #fff8dc; padding: 15px; border-radius: 5px;">
+    <ul>
+        <li><strong>PC1 (X-axis):</strong> Captures the largest source of variation in the data</li>
+        <li><strong>PC2 (Y-axis):</strong> Captures the second largest source of variation</li>
+        <li><strong>Clustering:</strong> Files that cluster together have similar expression patterns</li>
+        <li><strong>Separation:</strong> Distance between points indicates how different their expression profiles are</li>
+        <li><strong>Data Type Separation:</strong> If riboseq and mRNA files cluster separately, it indicates systematic differences between transcription and translation</li>
+    </ul>
+</div>
+
+<hr>
+
+<div style="text-align: center; margin: 20px 0;">
+    <a href="{% url 'upload_parquet' %}" style="margin-right: 10px;">
+        <button style="padding: 10px; background-color: #368BC1; color: white; border: none; border-radius: 5px;">
+            Upload More Riboseq Files
+        </button>
+    </a>
+    <a href="{% url 'upload_mrna_parquet' %}">
+        <button style="padding: 10px; background-color: #ff7f0e; color: white; border: none; border-radius: 5px;">
+            Upload More mRNA Files
+        </button>
+    </a>
+</div>
+
+{% endblock %}

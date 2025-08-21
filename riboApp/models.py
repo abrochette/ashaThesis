@@ -35,6 +35,13 @@ class UploadedParquet(models.Model):
 
     def __str__(self):
         return self.file.name
+
+class UploadedMrnaParquet(models.Model):
+    file = models.FileField(upload_to="mrnaFiles/")  # Stores uploaded mRNA file location
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.file.name
 class ParquetData(models.Model):
     transcript_id = models.CharField(max_length=255, db_index=True, default="NA")  # Index for quick lookups
     gene_name = models.CharField(max_length=255, db_index=True, default="NA")  # Gene name as indexed field
