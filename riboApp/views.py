@@ -1157,3 +1157,215 @@ def process_ribo_files(request):
                                        ylim=(0, 50))
 
     return render(request, "riboApp/coverageGraphs.html", {"start_plot": start_plot_path, "stop_plot": stop_plot_path})
+
+def psite_metagene_plots(request):
+    """Generate P-site offset metagene plots for parquet files"""
+    parquet_files = get_available_parquet_files()
+    start_plot = None
+    stop_plot = None
+    error_message = None
+
+    if request.method == "POST":
+        selected_files = request.POST.getlist("selected_files")
+
+        if not selected_files:
+            error_message = "Please select at least one file."
+        else:
+            try:
+                # Generate metagene plots
+                start_plot, stop_plot = generate_psite_metagene_plots(selected_files)
+            except Exception as e:
+                error_message = f"Error generating plots: {str(e)}"
+
+    return render(request, "riboApp/psiteMetagene.html", {
+        "parquet_files": parquet_files,
+        "start_plot": start_plot,
+        "stop_plot": stop_plot,
+        "error_message": error_message,
+    })
+
+def generate_psite_metagene_plots(selected_files):
+    """Generate start and stop codon metagene plots with P-site offsets"""
+
+    # Load P-site offsets
+    if not os.path.exists(OFFSET_CSV):
+        raise ValueError("P-site offset CSV file not found!")
+
+    offsets_df = pd.read_csv(OFFSET_CSV)
+    offsets_df.columns = ["experiment", "read_length", "P_site_offset"]
+
+    # Process each selected file
+    all_start_data = []
+    all_stop_data = []
+
+    for file in selected_files:
+        file_basename = os.path.splitext(file)[0]
+        file_path = os.path.join(PARQUET_FOLDER, file)
+
+        # Get P-site offsets for this experiment
+        file_offsets = offsets_df[offsets_df["experiment"] == file_basename]
+        if file_offsets.empty:
+            print(f"Warning: No P-site offsets found for {file_basename}")
+            continue
+
+        # Read parquet file
+        df = pq.read_table(file_path, columns=[
+            "gene_name", "start_position", "end_position", "read_length", "read_count", "region"
+        ]).to_pandas()
+
+        # Filter for CDS regions only (where ribosomes should be)
+        df = df[df["region"] == "CDS"]
+
+        if df.empty:
+            print(f"Warning: No CDS data found in {file}")
+            continue
+
+        # Calculate total reads for normalization
+        total_reads = df["read_count"].sum()
+
+        # Process start codon data (positions around start codon)
+        start_data = process_metagene_data(df, file_offsets, file_basename, total_reads, "start")
+        if not start_data.empty:
+            all_start_data.append(start_data)
+
+        # Process stop codon data (positions around stop codon)
+        stop_data = process_metagene_data(df, file_offsets, file_basename, total_reads, "stop")
+        if not stop_data.empty:
+            all_stop_data.append(stop_data)
+
+    if not all_start_data and not all_stop_data:
+        raise ValueError("No valid data found for selected files")
+
+    # Combine data from all files
+    combined_start = pd.concat(all_start_data, ignore_index=True) if all_start_data else pd.DataFrame()
+    combined_stop = pd.concat(all_stop_data, ignore_index=True) if all_stop_data else pd.DataFrame()
+
+    # Generate plots
+    start_plot_html = None
+    stop_plot_html = None
+
+    if not combined_start.empty:
+        start_plot_html = create_metagene_plot(
+            combined_start,
+            "Start Codon Coverage After P-site Shifts",
+            xlim=(-30, 62)
+        )
+
+    if not combined_stop.empty:
+        # Let the stop codon plot auto-scale its y-axis
+        stop_plot_html = create_metagene_plot(
+            combined_stop,
+            "Stop Codon Coverage After P-site Shifts",
+            xlim=(-2, 60)
+        )
+
+    return start_plot_html, stop_plot_html
+
+def process_metagene_data(df, file_offsets, experiment_name, total_reads, site_type):
+    """Process parquet data to create metagene coverage around start/stop codons"""
+
+    # Create offset mapping
+    length_to_offset = dict(zip(file_offsets["read_length"], file_offsets["P_site_offset"]))
+
+    # Filter for read lengths 28-32 (typical ribosome footprint sizes)
+    df_filtered = df[df["read_length"].between(28, 32)].copy()
+
+    if df_filtered.empty:
+        return pd.DataFrame()
+
+    # Apply P-site offsets
+    df_filtered["offset"] = df_filtered["read_length"].map(length_to_offset)
+    df_filtered = df_filtered.dropna(subset=["offset"])
+    df_filtered["p_site"] = df_filtered["start_position"] + df_filtered["offset"].astype(int)
+
+    # For start codon analysis, we want positions relative to start codon (position 0)
+    # For stop codon analysis, we want positions relative to stop codon
+    # Since we don't have explicit start/stop codon positions, we'll use gene boundaries
+    # and assume start codon is at the beginning of CDS and stop codon at the end
+
+    metagene_data = []
+
+    # Group by gene to get start/stop positions
+    for gene_name, gene_df in df_filtered.groupby("gene_name"):
+        if len(gene_df) < 10:  # Skip genes with too few reads
+            continue
+
+        if site_type == "start":
+            # Use the minimum P-site position as the start codon reference
+            reference_pos = gene_df["p_site"].min()
+            # Look at positions from -30 to +62 relative to start
+            position_range = range(-30, 63)
+        else:  # stop
+            # For stop codon, we need to find the actual CDS end
+            # Use P-site positions and find the end of the CDS region
+            # The stop codon should be near the end of the CDS
+            p_sites = gene_df["p_site"].sort_values()
+            # Use a position that's likely to be near the stop codon
+            # Take the 95th percentile of P-site positions as stop codon reference
+            reference_pos = int(p_sites.quantile(0.95))
+            # Look at positions from -2 to +60 relative to stop codon
+            position_range = range(-2, 61)
+
+        # Calculate relative positions
+        gene_df = gene_df.copy()
+        gene_df["relative_position"] = gene_df["p_site"] - reference_pos
+
+
+        # Aggregate counts for each relative position
+        for pos in position_range:
+            pos_data = gene_df[gene_df["relative_position"] == pos]
+            count = pos_data["read_count"].sum()
+
+            if count > 0:  # Only include positions with reads
+                metagene_data.append({
+                    "experiment": experiment_name,
+                    "shifted_position": pos,
+                    "avg_count": (count / total_reads) * 1e6,  # Normalize to RPM
+                    "gene_name": gene_name
+                })
+
+    if not metagene_data:
+        return pd.DataFrame()
+
+    # Convert to DataFrame and aggregate across genes for each experiment
+    metagene_df = pd.DataFrame(metagene_data)
+
+    # Average across all genes for each position and experiment
+    result = metagene_df.groupby(["shifted_position", "experiment"], as_index=False)["avg_count"].mean()
+
+    return result
+
+def create_metagene_plot(data, title, xlim=None, ylim=None):
+    """Create interactive metagene plot using Plotly"""
+
+    if data.empty:
+        return "<p>No data available for plotting</p>"
+
+    # Define custom colors (matching the R script)
+    custom_colors = ["steelblue", "violetred", "darkviolet", "turquoise"]
+
+    fig = px.line(
+        data,
+        x="shifted_position",
+        y="avg_count",
+        color="experiment",
+        title=title,
+        labels={
+            "shifted_position": "Shifted Position",
+            "avg_count": "Normalized Read Count (RPM)"
+        },
+        color_discrete_sequence=custom_colors
+    )
+
+    # Apply axis limits if specified
+    if xlim:
+        fig.update_xaxes(range=xlim)
+    if ylim:
+        fig.update_yaxes(range=ylim)
+
+    fig.update_layout(
+        template="plotly_white",
+        hovermode="x unified"
+    )
+
+    return fig.to_html(full_html=False)

@@ -23,6 +23,8 @@ urlpatterns = [
     # mRNA analysis URLs
     path("combined_geneCounts/", views.combined_geneCounts, name="combined_geneCounts"),
     path("combined_pca/", views.combined_pca_gene_counts, name="combined_pca_plot"),
+    # P-site metagene analysis
+    path("psite_metagene/", views.psite_metagene_plots, name="psite_metagene"),
 ]
 
 if settings.DEBUG:
