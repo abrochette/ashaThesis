@@ -61,16 +61,28 @@
         </ul>
     </div>
 
-    <div id="bin-count-links" style="margin-top: 20px;">
-        <h3>View Bin Counts for Selected Riboseq File</h3>
-        {% if ribo_file %}
-            <a href="{% url 'binCounts' %}?selected_file={{ ribo_file }}" class="btn btn-primary">
-                Bin Counts for {{ ribo_file }}
+    <div id="analysis-links" style="margin-top: 20px;">
+        <h3>Additional Analysis for Selected Files</h3>
+        <div style="margin-bottom: 15px;">
+            <strong>Bin Counts Analysis:</strong>
+            {% if ribo_file %}
+                <a href="{% url 'binCounts' %}?selected_file={{ ribo_file }}" class="btn btn-primary">
+                    Bin Counts for {{ ribo_file }}
+                </a>
+                <p style="margin-top: 10px; color: #666; font-size: 14px;">
+                    <em>Note: Bin count analysis is only available for riboseq data since mRNA data doesn't contain P-site positioning information.</em>
+                </p>
+            {% endif %}
+        </div>
+        <div>
+            <strong>Read Length Distribution:</strong>
+            <a href="{% url 'readLengthDistribution' %}" class="btn btn-success">
+                Read Length Distribution Analysis
             </a>
-            <p style="margin-top: 10px; color: #666; font-size: 14px;">
-                <em>Note: Bin count analysis is only available for riboseq data since mRNA data doesn't contain P-site positioning information.</em>
-            </p>
-        {% endif %}
+            <small style="display: block; margin-top: 5px; color: #666;">
+                Analyze read length distributions for riboseq and mRNA samples
+            </small>
+        </div>
     </div>
 {% endif %}
 

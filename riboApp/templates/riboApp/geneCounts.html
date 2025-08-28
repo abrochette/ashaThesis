@@ -62,18 +62,30 @@
     </ul>
 </div>
 
-<div id="bin-count-links" style="margin-top: 20px;">
-    <h3>View Bin Counts for Selected Files</h3>
-    {% if file1 %}
-        <a href="{% url 'binCounts' %}?selected_file={{ file1 }}" class="btn btn-primary" style="margin-right: 10px;">
-            Bin Counts for {{ file1 }}
+<div id="analysis-links" style="margin-top: 20px;">
+    <h3>Additional Analysis for Selected Files</h3>
+    <div style="margin-bottom: 15px;">
+        <strong>Bin Counts Analysis:</strong>
+        {% if file1 %}
+            <a href="{% url 'binCounts' %}?selected_file={{ file1 }}" class="btn btn-primary" style="margin-right: 10px;">
+                Bin Counts for {{ file1 }}
+            </a>
+        {% endif %}
+        {% if file2 %}
+            <a href="{% url 'binCounts' %}?selected_file={{ file2 }}" class="btn btn-primary">
+                Bin Counts for {{ file2 }}
+            </a>
+        {% endif %}
+    </div>
+    <div>
+        <strong>Read Length Distribution:</strong>
+        <a href="{% url 'readLengthDistribution' %}" class="btn btn-success">
+            Read Length Distribution Analysis
         </a>
-    {% endif %}
-    {% if file2 %}
-        <a href="{% url 'binCounts' %}?selected_file={{ file2 }}" class="btn btn-primary">
-            Bin Counts for {{ file2 }}
-        </a>
-    {% endif %}
+        <small style="display: block; margin-top: 5px; color: #666;">
+            Analyze read length distributions for multiple samples
+        </small>
+    </div>
 </div>
 {% endif %}  {# End conditional block #}
 

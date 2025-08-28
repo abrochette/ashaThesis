@@ -204,66 +204,12 @@ def get_gene_reads(gene_name):
     return pd.concat(all_data, ignore_index=True)
 # Upload and store all Parquet data
 def upload_parquet(request):
-    ribo_form = ParquetUploadForm()
-    mrna_form = MrnaParquetUploadForm()
     bulk_ribo_form = BulkParquetUploadForm()
     bulk_mrna_form = BulkMrnaParquetUploadForm()
 
     if request.method == "POST":
         # Check which form was submitted
-        if 'ribo_submit' in request.POST:
-            ribo_form = ParquetUploadForm(request.POST, request.FILES)
-            if ribo_form.is_valid():
-                uploaded_file = ribo_form.save()  # Saves file path in DB
-                file_path = uploaded_file.file.path  # Full file path
-
-                # Check if the file is valid
-                try:
-                    df = pq.read_table(file_path).to_pandas()  # Load with PyArrow for speed
-
-                    # Ensure required columns exist
-                    required_columns = {"transcript_id", "gene_name", "start_position", "end_position",
-                                        "strand", "read_id", "read_length", "read_count", "region", "source_file"}
-
-                    missing_columns = required_columns - set(df.columns)
-                    if missing_columns:
-                        messages.error(request, f"Riboseq file missing columns: {', '.join(missing_columns)}")
-                        return redirect("upload_parquet")
-
-                except Exception as e:
-                    messages.error(request, f"Invalid Riboseq Parquet file: {str(e)}")
-                    return redirect("upload_parquet")
-
-                messages.success(request, f"Riboseq file uploaded successfully: {uploaded_file.file.name}")
-                return redirect("upload_parquet")
-
-        elif 'mrna_submit' in request.POST:
-            mrna_form = MrnaParquetUploadForm(request.POST, request.FILES)
-            if mrna_form.is_valid():
-                uploaded_file = mrna_form.save()  # Saves file path in DB
-                file_path = uploaded_file.file.path  # Full file path
-
-                # Check if the file is valid
-                try:
-                    df = pq.read_table(file_path).to_pandas()  # Load with PyArrow for speed
-
-                    # Ensure required columns exist (same as riboseq for consistency)
-                    required_columns = {"transcript_id", "gene_name", "start_position", "end_position",
-                                        "strand", "read_id", "read_length", "read_count", "region", "source_file"}
-
-                    missing_columns = required_columns - set(df.columns)
-                    if missing_columns:
-                        messages.error(request, f"mRNA file missing columns: {', '.join(missing_columns)}")
-                        return redirect("upload_parquet")
-
-                except Exception as e:
-                    messages.error(request, f"Invalid mRNA Parquet file: {str(e)}")
-                    return redirect("upload_parquet")
-
-                messages.success(request, f"mRNA file uploaded successfully: {uploaded_file.file.name}")
-                return redirect("upload_parquet")
-
-        elif 'bulk_ribo_submit' in request.POST:
+        if 'bulk_ribo_submit' in request.POST:
             bulk_ribo_form = BulkParquetUploadForm(request.POST, request.FILES)
             if bulk_ribo_form.is_valid():
                 files = request.FILES.getlist('files')
@@ -346,8 +292,6 @@ def upload_parquet(request):
 
 
     return render(request, "riboApp/uploadParquet.html", {
-        "ribo_form": ribo_form,
-        "mrna_form": mrna_form,
         "bulk_ribo_form": bulk_ribo_form,
         "bulk_mrna_form": bulk_mrna_form
     })
@@ -772,6 +716,442 @@ def bin_counts_view(request):
             "plots": plots,
             "error_message": error_message,
             "selected_file": selected_file,
+        },
+    )
+
+
+def get_read_length_distribution(selected_files):
+    """
+    Generate read length distribution plots for selected files.
+    Returns combined normalized plot and individual plots.
+    """
+    if not selected_files:
+        return None, "No files selected!"
+
+    # Use cache key for the combination of files
+    files_key = "_".join(sorted(selected_files))
+    cache_key = f"read_length_dist_{files_key}"
+
+    cached_plots = cache.get(cache_key)
+    if cached_plots is not None:
+        print(f"Loaded read length distribution plots from cache for {files_key}")
+        return cached_plots, None
+
+    plot_html = ""
+    all_distributions = {}
+
+    # Process each file
+    for selected_file in selected_files:
+        file_path = os.path.join(PARQUET_FOLDER, selected_file)
+        if not os.path.exists(file_path):
+            continue
+
+        print(f"Processing read length distribution for {selected_file}")
+
+        # Read the parquet file to get read lengths
+        try:
+            # Read in chunks to handle large files
+            read_lengths = []
+            pq_file = pq.ParquetFile(file_path)
+
+            for batch in pq_file.iter_batches(batch_size=100000, columns=["read_length"]):
+                df_chunk = batch.to_pandas()
+                read_lengths.extend(df_chunk["read_length"].tolist())
+
+            if not read_lengths:
+                continue
+
+            # Count occurrences of each read length
+            read_length_counts = pd.Series(read_lengths).value_counts().sort_index()
+
+            # Store for combined plot
+            file_basename = os.path.splitext(selected_file)[0]
+            all_distributions[file_basename] = {
+                'lengths': read_length_counts.index.tolist(),
+                'counts': read_length_counts.values.tolist(),
+                'total_reads': sum(read_length_counts.values)
+            }
+
+            # Create individual plot for this file
+            fig_individual = px.line(
+                x=read_length_counts.index,
+                y=read_length_counts.values,
+                labels={"x": "Read Length (nt)", "y": "Count"},
+                title=f"Read Length Distribution - {file_basename}",
+            )
+            fig_individual.update_traces(line=dict(width=2))
+            fig_individual.update_layout(
+                xaxis_title="Read Length (nt)",
+                yaxis_title="Count",
+                showlegend=False
+            )
+            plot_html += fig_individual.to_html(full_html=False)
+
+        except Exception as e:
+            print(f"Error processing {selected_file}: {str(e)}")
+            continue
+
+    # Create combined normalized plot
+    if all_distributions:
+        combined_data = []
+        colors = px.colors.qualitative.Set1[:len(all_distributions)]
+
+        for i, (file_name, data) in enumerate(all_distributions.items()):
+            # Normalize by total reads
+            normalized_counts = [count / data['total_reads'] for count in data['counts']]
+
+            for length, norm_count in zip(data['lengths'], normalized_counts):
+                combined_data.append({
+                    'Read Length': length,
+                    'Normalized Count': norm_count,
+                    'Sample': file_name
+                })
+
+        combined_df = pd.DataFrame(combined_data)
+
+        fig_combined = px.line(
+            combined_df,
+            x='Read Length',
+            y='Normalized Count',
+            color='Sample',
+            title="Normalized Read Length Distribution - All Samples",
+            labels={"Read Length": "Read Length (nt)", "Normalized Count": "Normalized Count (reads/total reads)"}
+        )
+        fig_combined.update_traces(line=dict(width=2))
+        fig_combined.update_layout(
+            xaxis_title="Read Length (nt)",
+            yaxis_title="Normalized Count (reads/total reads)",
+            legend_title="Sample"
+        )
+
+        # Add combined plot at the beginning
+        plot_html = fig_combined.to_html(full_html=False) + plot_html
+
+    # Cache the final HTML
+    cache.set(cache_key, plot_html, timeout=None)
+    print(f"Stored read length distribution plots in cache for {files_key}")
+
+    return plot_html, None
+
+
+def read_length_distribution_view(request):
+    """
+    View for read length distribution analysis.
+    """
+    parquet_files = get_available_parquet_files()
+    plots = None
+    error_message = None
+    selected_files = []
+
+    if request.method == "POST":
+        selected_files = request.POST.getlist("selected_files")
+        if selected_files:
+            plots, error_message = get_read_length_distribution(selected_files)
+        else:
+            error_message = "No files selected!"
+
+    return render(
+        request,
+        "riboApp/readLengthDistribution.html",
+        {
+            "parquet_files": parquet_files,
+            "plots": plots,
+            "error_message": error_message,
+            "selected_files": selected_files,
+        },
+    )
+
+
+def generate_stop_codon_periodicity(selected_files):
+    """
+    Generate stop codon periodicity plots WITHOUT P-site shifts.
+    Uses the EXACT same logic as process_metagene_data but without applying P-site offsets.
+    """
+    if not selected_files:
+        return None, "No files selected!"
+
+    # Load P-site offsets (needed for read length filtering)
+    if not os.path.exists(OFFSET_CSV):
+        return None, "P-site offset CSV file not found! Please configure P-site offsets first."
+
+    offsets_df = pd.read_csv(OFFSET_CSV)
+    offsets_df.columns = ["experiment", "read_length", "P_site_offset"]
+
+    # Process each selected file using EXACT same logic as process_metagene_data
+    all_stop_data = []
+
+    for selected_file in selected_files:
+        file_basename = os.path.splitext(selected_file)[0]
+        file_path = os.path.join(PARQUET_FOLDER, selected_file)
+
+        print(f"Processing stop codon periodicity for {selected_file}")
+
+        # Get P-site offsets for this experiment
+        file_offsets = offsets_df[offsets_df["experiment"] == file_basename]
+        if file_offsets.empty:
+            print(f"Warning: No P-site offsets found for {file_basename}")
+            continue
+
+        try:
+            # Read parquet file - EXACT same as process_metagene_data
+            df = pq.read_table(file_path, columns=[
+                "gene_name", "start_position", "end_position", "read_length", "read_count", "region"
+            ]).to_pandas()
+
+            # Filter for CDS regions only - EXACT same as process_metagene_data
+            df = df[df["region"] == "CDS"]
+
+            if df.empty:
+                print(f"Warning: No CDS data found in {selected_file}")
+                continue
+
+            # Calculate total reads for normalization - EXACT same as process_metagene_data
+            total_reads = df["read_count"].sum()
+
+            # Use the EXACT same logic as process_metagene_data but for stop codon only
+            stop_data = process_metagene_data_no_shift(df, file_offsets, file_basename, total_reads, "stop", None)
+            if not stop_data.empty:
+                all_stop_data.append(stop_data)
+
+        except Exception as e:
+            print(f"Error processing {selected_file}: {str(e)}")
+            continue
+
+    if not all_stop_data:
+        return None, "No valid data found for selected files"
+
+    # Combine data from all files - EXACT same as existing
+    combined_stop = pd.concat(all_stop_data, ignore_index=True)
+
+    # Create the plot using the same function as existing metagene analysis
+    plot_html = create_metagene_plot(
+        combined_stop,
+        "Stop Codon Periodicity (No P-site Shifts Applied)",
+        xlim=(-20, 60)
+    )
+
+    return plot_html, None
+
+
+def process_metagene_data_no_shift(df, file_offsets, experiment_name, total_reads, site_type, selected_genes=None):
+    """
+    EXACT copy of process_metagene_data but WITHOUT applying P-site offsets.
+    This is identical to the existing function except: df_filtered["p_site"] = df_filtered["start_position"]
+    """
+
+    # Filter by selected genes if provided - EXACT same as original
+    if selected_genes:
+        df = df[df["gene_name"].isin(selected_genes)]
+        if df.empty:
+            return pd.DataFrame()
+
+    # Create offset mapping - EXACT same as original
+    length_to_offset = dict(zip(file_offsets["read_length"], file_offsets["P_site_offset"]))
+
+    # Filter for read lengths 28-32 (typical ribosome footprint sizes) - EXACT same as original
+    df_filtered = df[df["read_length"].between(28, 32)].copy()
+
+    if df_filtered.empty:
+        return pd.DataFrame()
+
+    # Apply P-site offsets - THIS IS THE ONLY DIFFERENCE
+    df_filtered["offset"] = df_filtered["read_length"].map(length_to_offset)
+    df_filtered = df_filtered.dropna(subset=["offset"])
+    # ORIGINAL: df_filtered["p_site"] = df_filtered["start_position"] + df_filtered["offset"].astype(int)
+    # NO SHIFT: df_filtered["p_site"] = df_filtered["start_position"]  # NO OFFSET APPLIED
+    df_filtered["p_site"] = df_filtered["start_position"]  # NO OFFSET APPLIED
+
+    metagene_data = []
+
+    # Group by gene to get start/stop positions - EXACT same as original
+    for gene_name, gene_df in df_filtered.groupby("gene_name"):
+        if len(gene_df) < 10:  # Skip genes with too few reads - EXACT same as original
+            continue
+
+        if site_type == "start":
+            # Use the minimum P-site position as the start codon reference - EXACT same as original
+            reference_pos = gene_df["p_site"].min()
+            # Look at positions from -30 to +62 relative to start - EXACT same as original
+            position_range = range(-30, 63)
+        else:  # stop - MODIFIED to show upstream positions for P-site offset determination
+            # For stop codon, we need to find the actual CDS end - EXACT same as original
+            # Use P-site positions and find the end of the CDS region - EXACT same as original
+            # The stop codon should be near the end of the CDS - EXACT same as original
+            p_sites = gene_df["p_site"].sort_values()
+            # Use a position that's likely to be near the stop codon - EXACT same as original
+            # Take the 95th percentile of P-site positions as stop codon reference - EXACT same as original
+            reference_pos = int(p_sites.quantile(0.95))
+            # Look at positions from -20 to +60 relative to stop codon - MODIFIED to show upstream positions
+            position_range = range(-20, 61)
+
+        # Calculate relative positions - EXACT same as original
+        gene_df = gene_df.copy()
+        gene_df["relative_position"] = gene_df["p_site"] - reference_pos
+
+        # Aggregate counts for each relative position - EXACT same as original
+        for pos in position_range:
+            pos_data = gene_df[gene_df["relative_position"] == pos]
+            count = pos_data["read_count"].sum()
+
+            if count > 0:  # Only include positions with reads - EXACT same as original
+                metagene_data.append({
+                    "experiment": experiment_name,
+                    "shifted_position": pos,
+                    "avg_count": (count / total_reads) * 1e6,  # Normalize to RPM - EXACT same as original
+                    "gene_name": gene_name
+                })
+
+    if not metagene_data:
+        return pd.DataFrame()
+
+    # Convert to DataFrame and aggregate across genes for each experiment - EXACT same as original
+    metagene_df = pd.DataFrame(metagene_data)
+
+    if selected_genes:
+        # When using selected genes, combine all genes into a single line per experiment - EXACT same as original
+        # Sum the counts across all selected genes for each position - EXACT same as original
+        result = metagene_df.groupby(["shifted_position", "experiment"], as_index=False)["avg_count"].sum()
+        # Add a label to indicate this is selected genes - EXACT same as original
+        result["experiment"] = result["experiment"] + " (Selected Genes)"
+    else:
+        # Average across all genes for each position and experiment (original behavior) - EXACT same as original
+        result = metagene_df.groupby(["shifted_position", "experiment"], as_index=False)["avg_count"].mean()
+
+    return result
+
+
+def save_psite_offsets_csv(offset_data):
+    """Save P-site offset data to CSV file"""
+    try:
+        # Convert offset data to DataFrame
+        rows = []
+        for experiment, read_lengths in offset_data.items():
+            for read_length, offset in read_lengths.items():
+                rows.append({
+                    "Experiment": experiment,
+                    "Read Length": int(read_length),
+                    "P-site Offset": int(offset)
+                })
+
+        df = pd.DataFrame(rows)
+        df = df.sort_values(["Experiment", "Read Length"])
+
+        # Save to CSV
+        df.to_csv(OFFSET_CSV, index=False)
+        print(f"Saved P-site offsets to {OFFSET_CSV}")
+        return True
+
+    except Exception as e:
+        print(f"Error saving P-site offsets: {str(e)}")
+        return False
+
+
+def psite_offset_view(request):
+    """
+    View for P-site offset analysis and configuration.
+    Shows stop codon periodicity without P-site shifts and allows offset input.
+    """
+    parquet_files = get_available_parquet_files()
+    plot_html = None
+    error_message = None
+    success_message = None
+    selected_files = []
+    current_offsets = {}
+
+    # Load current P-site offsets if they exist
+    if os.path.exists(OFFSET_CSV):
+        try:
+            offsets_df = pd.read_csv(OFFSET_CSV)
+            for _, row in offsets_df.iterrows():
+                exp = row["Experiment"]
+                if exp not in current_offsets:
+                    current_offsets[exp] = {}
+                current_offsets[exp][str(row["Read Length"])] = row["P-site Offset"]
+        except Exception as e:
+            print(f"Error loading current offsets: {str(e)}")
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "generate_plot":
+            selected_files = request.POST.getlist("selected_files")
+            if selected_files:
+                plot_html, error_message = generate_stop_codon_periodicity(selected_files)
+            else:
+                error_message = "No files selected!"
+
+        elif action == "upload_csv":
+            uploaded_file = request.FILES.get("offset_csv")
+            if uploaded_file:
+                try:
+                    # Read uploaded CSV
+                    df = pd.read_csv(uploaded_file)
+
+                    # Validate CSV format
+                    required_columns = {"Experiment", "Read Length", "P-site Offset"}
+                    if not required_columns.issubset(set(df.columns)):
+                        error_message = f"CSV must contain columns: {', '.join(required_columns)}"
+                    else:
+                        # Save the uploaded file
+                        df.to_csv(OFFSET_CSV, index=False)
+                        success_message = "P-site offset CSV uploaded successfully!"
+
+                        # Reload current offsets
+                        current_offsets = {}
+                        for _, row in df.iterrows():
+                            exp = row["Experiment"]
+                            if exp not in current_offsets:
+                                current_offsets[exp] = {}
+                            current_offsets[exp][str(row["Read Length"])] = row["P-site Offset"]
+
+                except Exception as e:
+                    error_message = f"Error processing uploaded CSV: {str(e)}"
+            else:
+                error_message = "No file uploaded!"
+
+        elif action == "manual_input":
+            # Process manual offset input
+            try:
+                offset_data = {}
+
+                # Get all form data for manual offsets
+                for key, value in request.POST.items():
+                    if key.startswith("offset_") and value.strip():
+                        # Parse key: offset_ExperimentName_ReadLength
+                        # Remove "offset_" prefix and split by last underscore
+                        key_without_prefix = key[7:]  # Remove "offset_"
+                        parts = key_without_prefix.rsplit("_", 1)  # Split from right, only once
+
+                        if len(parts) == 2:
+                            experiment = parts[0]
+                            read_length = parts[1]
+
+                            if experiment not in offset_data:
+                                offset_data[experiment] = {}
+                            offset_data[experiment][read_length] = int(value)
+
+                if offset_data:
+                    if save_psite_offsets_csv(offset_data):
+                        success_message = "P-site offsets saved successfully!"
+                        current_offsets = offset_data
+                    else:
+                        error_message = "Error saving P-site offsets!"
+                else:
+                    error_message = "No offset values provided!"
+
+            except Exception as e:
+                error_message = f"Error processing manual input: {str(e)}"
+
+    return render(
+        request,
+        "riboApp/psiteOffset.html",
+        {
+            "parquet_files": parquet_files,
+            "plot_html": plot_html,
+            "error_message": error_message,
+            "success_message": success_message,
+            "selected_files": selected_files,
+            "current_offsets": current_offsets,
         },
     )
 

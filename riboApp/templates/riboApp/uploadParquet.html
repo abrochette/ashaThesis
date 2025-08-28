@@ -14,9 +14,9 @@
 
 
 
-    <!-- Bulk Upload Section -->
+    <!-- File Upload Section -->
     <div style="background-color: rgba(13, 110, 253, 0.1); border: 1px solid rgba(13, 110, 253, 0.2); border-radius: 5px; padding: 15px; margin-bottom: 20px;">
-        <h2 style="color: #0d47a1; margin-top: 0;">Bulk Upload (Recommended)</h2>
+        <h2 style="color: #0d47a1; margin-top: 0;">Upload Files</h2>
 
         <h3>Upload Multiple Riboseq Files</h3>
         <form method="post" enctype="multipart/form-data" class="form-group">
@@ -39,26 +39,7 @@
         </form>
     </div>
 
-    <!-- Single File Upload Section -->
-    <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
-        <h2 style="color: #495057; margin-top: 0;">Single File Upload</h2>
 
-        <h3>Upload Single Riboseq File</h3>
-        <form method="post" enctype="multipart/form-data" class="form-group">
-            {% csrf_token %}
-            {{ ribo_form|crispy }}
-            <button type="submit" name="ribo_submit" class="btn btn-primary">Upload Riboseq File</button>
-        </form>
-
-        <hr style="margin: 20px 0;">
-
-        <h3>Upload Single mRNA File</h3>
-        <form method="post" enctype="multipart/form-data" class="form-group">
-            {% csrf_token %}
-            {{ mrna_form|crispy }}
-            <button type="submit" name="mrna_submit" class="btn" style="background-color: #ff7f0e; color: white;">Upload mRNA File</button>
-        </form>
-    </div>
 
     <hr>
 
@@ -75,6 +56,12 @@
         <a href="{% url 'binCounts' %}">
             <button style="padding: 10px; background-color: #0099c6; color: white; border: none; border-radius: 5px; cursor: pointer;">
                 Bin Counts
+            </button>
+        </a>
+
+        <a href="{% url 'readLengthDistribution' %}">
+            <button style="padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                Read Length Distribution
             </button>
         </a>
 

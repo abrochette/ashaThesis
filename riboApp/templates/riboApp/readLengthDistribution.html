@@ -1,0 +1,79 @@
+{% extends 'riboApp/base.html' %}
+
+{% block content %}
+    <h1>Read Length Distribution Analysis</h1>
+
+    <form method="POST">
+        {% csrf_token %}
+        <div style="margin-bottom: 20px;">
+            <label for="selected_files"><strong>Select Parquet Files for Analysis:</strong></label>
+            <div style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; max-height: 200px; overflow-y: auto;">
+                {% for file in parquet_files %}
+                    <div style="margin-bottom: 5px;">
+                        <input type="checkbox" name="selected_files" value="{{ file }}" id="file_{{ forloop.counter }}"
+                               {% if file in selected_files %}checked{% endif %}>
+                        <label for="file_{{ forloop.counter }}" style="margin-left: 5px;">{{ file }}</label>
+                    </div>
+                {% endfor %}
+            </div>
+            <small style="color: #666; margin-top: 5px; display: block;">
+                Select one or more files to analyze read length distributions. 
+                The top plot will show normalized distributions for comparison across samples.
+            </small>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <button type="submit" style="padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                Generate Read Length Distributions
+            </button>
+            <button type="button" onclick="selectAll()" style="padding: 10px 20px; background-color: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
+                Select All
+            </button>
+            <button type="button" onclick="clearAll()" style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
+                Clear All
+            </button>
+        </div>
+    </form>
+
+    {% if error_message %}
+        <div style="background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin-bottom: 20px;">
+            <strong>Error:</strong> {{ error_message }}
+        </div>
+    {% endif %}
+
+    {% if plots %}
+        <div style="background-color: #d4edda; color: #155724; padding: 10px; border-radius: 5px; margin-bottom: 20px;">
+            <strong>Analysis Complete!</strong> 
+            The first plot shows normalized read length distributions for comparison across samples. 
+            Individual plots below show raw counts for each sample.
+        </div>
+    {% endif %}
+
+    <div id="plots">
+        {% if plots %}
+            {{ plots|safe }}
+        {% endif %}
+    </div>
+
+    <script>
+        function selectAll() {
+            const checkboxes = document.querySelectorAll('input[name="selected_files"]');
+            checkboxes.forEach(checkbox => checkbox.checked = true);
+        }
+        
+        function clearAll() {
+            const checkboxes = document.querySelectorAll('input[name="selected_files"]');
+            checkboxes.forEach(checkbox => checkbox.checked = false);
+        }
+    </script>
+
+    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-top: 20px; border-left: 4px solid #ffc107;">
+        <h4 style="margin-top: 0; color: #856404;">About Read Length Distribution Analysis</h4>
+        <ul style="color: #856404; margin-bottom: 0;">
+            <li><strong>Normalized Plot (Top):</strong> Shows read length distributions normalized by total reads per sample, allowing direct comparison between samples with different sequencing depths.</li>
+            <li><strong>Individual Plots:</strong> Show raw read counts for each sample, useful for understanding the absolute abundance of different read lengths.</li>
+            <li><strong>Read Length:</strong> Measured in nucleotides (nt). Typical ribosome-protected fragments range from ~20-35 nt.</li>
+            <li><strong>Quality Control:</strong> Consistent read length distributions across replicates indicate good experimental reproducibility.</li>
+        </ul>
+    </div>
+{% endblock %}

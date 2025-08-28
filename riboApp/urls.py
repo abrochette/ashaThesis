@@ -19,6 +19,8 @@ urlpatterns = [
     path("plot_gene_counts/", views.plot_gene_counts, name="plot_gene_counts"),
     path("save_selected_genes/", views.save_selected_genes, name="save_selected_genes"),
     path("binCounts/", views.bin_counts_view, name="binCounts"),
+    path("readLengthDistribution/", views.read_length_distribution_view, name="readLengthDistribution"),
+    path("psiteOffset/", views.psite_offset_view, name="psiteOffset"),
     path("pca/", views.pca_gene_counts, name="pca_plot"),
     path("coverageGraphs/", views.process_ribo_files, name="coverageGraphs"),
     # mRNA analysis URLs

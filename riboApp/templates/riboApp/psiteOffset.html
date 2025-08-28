@@ -1,0 +1,201 @@
+{% extends 'riboApp/base.html' %}
+{% load dict_extras %}
+
+{% block content %}
+    <h1>P-site Offset Analysis</h1>
+
+    <div style="background-color: #e7f3ff; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <h3>About This Analysis:</h3>
+        <p>
+            This page helps you determine and configure P-site offsets for your ribosome profiling data.
+            The plot shows read coverage around stop codons <strong>without any P-site shifts applied</strong>,
+            allowing you to identify the optimal offset for each read length.
+        </p>
+        <ul>
+            <li><strong>Stop Codon Reference:</strong> The red dashed line marks the stop codon position</li>
+            <li><strong>No P-site Shifts:</strong> Raw read positions are shown to help determine proper offsets</li>
+            <li><strong>Periodicity Pattern:</strong> Look for 3-nucleotide periodicity upstream of the stop codon</li>
+            <li><strong>Offset Determination:</strong> The distance from the main peak to the stop codon indicates the required P-site offset</li>
+        </ul>
+    </div>
+
+    <!-- Generate Periodicity Plot Section -->
+    <div style="background-color: rgba(13, 110, 253, 0.1); border: 1px solid rgba(13, 110, 253, 0.2); border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+        <h2 style="color: #0d47a1; margin-top: 0;">Generate Stop Codon Periodicity Plot</h2>
+        
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="generate_plot">
+            
+            <div style="margin-bottom: 20px;">
+                <label for="selected_files"><strong>Select Riboseq Files for Analysis:</strong></label>
+                <div style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; max-height: 200px; overflow-y: auto;">
+                    {% for file in parquet_files %}
+                        <div style="margin-bottom: 5px;">
+                            <input type="checkbox" name="selected_files" value="{{ file }}" id="file_{{ forloop.counter }}"
+                                   {% if file in selected_files %}checked{% endif %}>
+                            <label for="file_{{ forloop.counter }}" style="margin-left: 5px;">{{ file }}</label>
+                        </div>
+                    {% endfor %}
+                </div>
+                <small style="color: #666; margin-top: 5px; display: block;">
+                    Select files to analyze stop codon periodicity. This will show raw read positions without P-site shifts.
+                </small>
+            </div>
+            
+            <button type="submit" style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                Generate Periodicity Plot
+            </button>
+        </form>
+    </div>
+
+    <!-- Display Plot -->
+    {% if plot_html %}
+        <div style="margin: 20px 0;">
+            <h2>Stop Codon Periodicity Analysis</h2>
+            {{ plot_html|safe }}
+            
+            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                <h4 style="margin-top: 0;">How to Interpret This Plot:</h4>
+                <ul>
+                    <li><strong>Peak Position:</strong> Look for the highest peak upstream of the stop codon (red dashed line)</li>
+                    <li><strong>P-site Offset:</strong> The distance from the peak to the stop codon is your P-site offset</li>
+                    <li><strong>Example:</strong> If the peak is at position -12 and stop codon at 0, use offset +12</li>
+                    <li><strong>Read Length Specific:</strong> Different read lengths may require different offsets</li>
+                    <li><strong>Quality Check:</strong> Good data shows clear 3-nucleotide periodicity</li>
+                </ul>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Error/Success Messages -->
+    {% if error_message %}
+        <div style="background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin: 10px 0;">
+            <strong>Error:</strong> {{ error_message }}
+        </div>
+    {% endif %}
+
+    {% if success_message %}
+        <div style="background-color: #d4edda; color: #155724; padding: 10px; border-radius: 5px; margin: 10px 0;">
+            <strong>Success:</strong> {{ success_message }}
+        </div>
+    {% endif %}
+
+    <hr style="margin: 30px 0;">
+
+    <!-- P-site Offset Configuration Section -->
+    <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin-bottom: 20px;">
+        <h2 style="color: #856404; margin-top: 0;">Configure P-site Offsets</h2>
+        <p style="color: #856404;">
+            Set P-site offsets for your experiments. These offsets will be used in all other analyses 
+            (bin counts, metagene plots, etc.) to properly align ribosome P-sites.
+        </p>
+
+        <!-- Upload CSV Option -->
+        <div style="margin-bottom: 30px;">
+            <h3 style="color: #856404;">Option 1: Upload P-site Offset CSV</h3>
+            <form method="POST" enctype="multipart/form-data" style="margin-bottom: 15px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="upload_csv">
+                
+                <div style="margin-bottom: 10px;">
+                    <label for="offset_csv"><strong>Select CSV File:</strong></label>
+                    <input type="file" name="offset_csv" id="offset_csv" accept=".csv" 
+                           style="margin-left: 10px; padding: 5px;">
+                </div>
+                
+                <button type="submit" style="padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    Upload CSV
+                </button>
+            </form>
+            
+            <div style="background-color: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 14px;">
+                <strong>CSV Format:</strong> Must contain columns "Experiment", "Read Length", "P-site Offset"<br>
+                <strong>Example:</strong><br>
+                <code>
+                Experiment,Read Length,P-site Offset<br>
+                P42_Brain_Ribo_rep1,28,12<br>
+                P42_Brain_Ribo_rep1,29,12<br>
+                P42_Brain_Ribo_rep1,30,12
+                </code>
+            </div>
+        </div>
+
+        <!-- Manual Input Option -->
+        <div>
+            <h3 style="color: #856404;">Option 2: Manual Input</h3>
+            <p style="color: #856404; font-size: 14px;">
+                Enter P-site offsets manually for each experiment and read length combination.
+                Common read lengths for ribosome profiling are 28-32 nucleotides.
+            </p>
+            
+            {% if parquet_files %}
+                <form method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="manual_input">
+                    
+                    <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 15px;">
+                        {% for file in parquet_files %}
+                            {% with experiment=file|cut:".parquet" %}
+                                <div style="margin-bottom: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
+                                    <h4 style="margin-top: 0; color: #495057;">{{ experiment }}</h4>
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                                        {% for length in "28,29,30,31,32"|split:"," %}
+                                            <div>
+                                                <label for="offset_{{ experiment }}_{{ length }}" style="font-size: 13px;">
+                                                    Length {{ length }}:
+                                                </label>
+                                                <input type="number" 
+                                                       name="offset_{{ experiment }}_{{ length }}" 
+                                                       id="offset_{{ experiment }}_{{ length }}"
+                                                       value="{% if current_offsets|get_item:experiment %}{{ current_offsets|get_item:experiment|get_item:length }}{% endif %}"
+                                                       min="0" max="50" 
+                                                       style="width: 60px; padding: 2px; margin-left: 5px;">
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endwith %}
+                        {% endfor %}
+                    </div>
+                    
+                    <button type="submit" style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 15px;">
+                        Save P-site Offsets
+                    </button>
+                </form>
+            {% else %}
+                <p style="color: #6c757d;">No parquet files found. Please upload riboseq files first.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Current Offsets Display -->
+    {% if current_offsets %}
+        <div style="background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 5px; padding: 15px; margin-top: 20px;">
+            <h3 style="color: #0c5460; margin-top: 0;">Current P-site Offsets</h3>
+            <div style="max-height: 300px; overflow-y: auto;">
+                {% for experiment, offsets in current_offsets.items %}
+                    <div style="margin-bottom: 10px;">
+                        <strong>{{ experiment }}:</strong>
+                        {% for length, offset in offsets.items %}
+                            <span style="margin-right: 15px; font-size: 14px;">
+                                {{ length }}nt → {{ offset }}
+                            </span>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 30px;">
+        <h4 style="margin-top: 0;">Important Notes:</h4>
+        <ul style="margin-bottom: 0;">
+            <li>P-site offsets are applied in all downstream analyses (bin counts, metagene plots)</li>
+            <li>Offsets should be determined from high-quality ribosome profiling data</li>
+            <li>Typical offsets range from 9-15 nucleotides for read lengths 28-32</li>
+            <li>The offset CSV file is saved at <code>media/uorf_psite_offset.csv</code></li>
+            <li>Changes to offsets will affect all future analyses but won't update cached results</li>
+        </ul>
+    </div>
+{% endblock %}
