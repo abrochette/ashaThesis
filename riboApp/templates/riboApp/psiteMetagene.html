@@ -1,6 +1,8 @@
 {% extends 'riboApp/base.html' %}
 
 {% block content %}
+<!-- Load Plotly.js -->
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
 <h1>P-site Offset Metagene Analysis</h1>
 
@@ -81,6 +83,45 @@
         </div>
     </div>
 
+    <h3>Plot Axis Options (Optional):</h3>
+    <div style="margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+            <div>
+                <h4 style="margin-top: 0; color: #495057;">Start Codon Plot Bounds:</h4>
+                <div style="margin: 10px 0;">
+                    <label for="start_x_min">X-axis Min:</label>
+                    <input type="number" name="start_x_min" id="start_x_min" placeholder="-30 (default)" style="width: 100px; margin-left: 5px;">
+                    <label for="start_x_max" style="margin-left: 15px;">X-axis Max:</label>
+                    <input type="number" name="start_x_max" id="start_x_max" placeholder="62 (default)" style="width: 100px; margin-left: 5px;">
+                </div>
+                <div style="margin: 10px 0;">
+                    <label for="start_y_min">Y-axis Min:</label>
+                    <input type="number" name="start_y_min" id="start_y_min" placeholder="Auto" style="width: 100px; margin-left: 5px;">
+                    <label for="start_y_max" style="margin-left: 15px;">Y-axis Max:</label>
+                    <input type="number" name="start_y_max" id="start_y_max" placeholder="Auto" style="width: 100px; margin-left: 5px;">
+                </div>
+            </div>
+            <div>
+                <h4 style="margin-top: 0; color: #495057;">Stop Codon Plot Bounds:</h4>
+                <div style="margin: 10px 0;">
+                    <label for="stop_x_min">X-axis Min:</label>
+                    <input type="number" name="stop_x_min" id="stop_x_min" placeholder="-2 (default)" style="width: 100px; margin-left: 5px;">
+                    <label for="stop_x_max" style="margin-left: 15px;">X-axis Max:</label>
+                    <input type="number" name="stop_x_max" id="stop_x_max" placeholder="60 (default)" style="width: 100px; margin-left: 5px;">
+                </div>
+                <div style="margin: 10px 0;">
+                    <label for="stop_y_min">Y-axis Min:</label>
+                    <input type="number" name="stop_y_min" id="stop_y_min" placeholder="Auto" style="width: 100px; margin-left: 5px;">
+                    <label for="stop_y_max" style="margin-left: 15px;">Y-axis Max:</label>
+                    <input type="number" name="stop_y_max" id="stop_y_max" placeholder="Auto" style="width: 100px; margin-left: 5px;">
+                </div>
+            </div>
+        </div>
+        <div style="margin: 10px 0; font-size: 0.9em; color: #666;">
+            <strong>Note:</strong> Leave fields blank to use default bounds. Y-axis will auto-scale if not specified.
+        </div>
+    </div>
+
     <button type="submit" style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">
         Generate P-site Metagene Plots
     </button>
@@ -96,13 +137,21 @@
 
 {% if start_plot %}
     <h2>Start Codon Metagene Coverage</h2>
-    <div style="margin: 20px 0;">
+
+    <div style="margin-bottom: 10px;">
+        <a href="#" onclick="downloadMetageneCSV('start')"
+           style="background-color: #28a745; color: white; padding: 6px 12px; text-decoration: none; border-radius: 3px; display: inline-block; font-size: 14px;">
+            📊 Download Start Plot Data as CSV
+        </a>
+    </div>
+
+    <div id="start-plot-container" style="margin: 20px 0;">
         {{ start_plot|safe }}
     </div>
-    
+
     <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;">
         <small>
-            <strong>Interpretation:</strong> The peak around position 0 indicates proper P-site alignment at start codons. 
+            <strong>Interpretation:</strong> The peak around position 0 indicates proper P-site alignment at start codons.
             The 3-nucleotide periodicity downstream shows active translation.
         </small>
     </div>
@@ -110,10 +159,18 @@
 
 {% if stop_plot %}
     <h2>Stop Codon Metagene Coverage</h2>
-    <div style="margin: 20px 0;">
+
+    <div style="margin-bottom: 10px;">
+        <a href="#" onclick="downloadMetageneCSV('stop')"
+           style="background-color: #28a745; color: white; padding: 6px 12px; text-decoration: none; border-radius: 3px; display: inline-block; font-size: 14px;">
+            📊 Download Stop Plot Data as CSV
+        </a>
+    </div>
+
+    <div id="stop-plot-container" style="margin: 20px 0;">
         {{ stop_plot|safe }}
     </div>
-    
+
     <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0;">
         <small>
             <strong>Interpretation:</strong> The peak around position 0 shows ribosome accumulation at stop codons.
@@ -162,7 +219,33 @@
 {% endblock %}
 
 <script>
+
+// Function to download metagene CSV data
+function downloadMetageneCSV(plotType) {
+    // Get the form data to reconstruct the parameters
+    const form = document.querySelector('form');
+    const formData = new FormData(form);
+
+    // Build URL parameters
+    const params = new URLSearchParams();
+
+    // Add selected files
+    const selectedFiles = formData.getAll('selected_files');
+    selectedFiles.forEach(file => params.append('selected_files', file));
+
+    // Add selected genes option
+    const useSelectedGenes = formData.get('use_selected_genes') === 'on';
+    params.append('use_selected_genes', useSelectedGenes);
+
+    // Create download URL
+    const downloadUrl = `{% url 'download_csv' 'psite_metagene_${plotType}' %}?${params.toString()}`.replace('${plotType}', plotType);
+
+    // Trigger download
+    window.location.href = downloadUrl;
+}
+
 document.addEventListener("DOMContentLoaded", function () {
+
     // Handle gene file upload
     document.getElementById("upload-genes-button")?.addEventListener("click", function () {
         const fileInput = document.getElementById("gene-file-input");

@@ -30,6 +30,12 @@
 
 {% if plot_div %}
     <h2>Combined Gene Count Comparison</h2>
+    <div style="margin-bottom: 15px;">
+        <a href="{% url 'download_csv' 'combined_gene_counts' %}?ribo_file={{ ribo_file }}&mrna_file={{ mrna_file }}"
+           style="background-color: #28a745; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            📊 Download Plot Data as CSV
+        </a>
+    </div>
     <div id="plot-container">
         {{ plot_div|safe }}
     </div>

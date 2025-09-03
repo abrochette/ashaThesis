@@ -70,9 +70,10 @@ do_rnaseq: true
 # under input -> metadata below.
 do_metadata: true
 
+{barcodeComment}
 # These arguments are used for clipping adapters by cutadapt.
 # (see https://cutadapt.readthedocs.io/en/stable/guide.html )
-clip_arguments: '-u 1 -a CTGTAGGCACCATCAAT --overlap=4 --trimmed-only --maximum-length=40 --minimum-length=15 --quality-cutoff=28'
+clip_arguments: '{clipArguments}'
 
 # If you don't want to perform and adapter clipping,
 # you can comment the above option and use the option below.

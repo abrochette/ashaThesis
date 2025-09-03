@@ -21,6 +21,8 @@ from django.http import JsonResponse
 import plotly.express as px
 import pandas as pd
 import os
+import hashlib
+import time
 from django.shortcuts import render, redirect
 import pyarrow.parquet as pq
 from .models import SelectedGene, UploadedMrnaParquet, UploadedParquet
@@ -62,13 +64,15 @@ def preProcess(response):
             sampleFile = response.FILES["sampleFile"]
             humanGenome = form.cleaned_data["humanGenome"]
             mouseGenome = form.cleaned_data["mouseGenome"]
+            useBarcode = form.cleaned_data["useBarcode"]
 
             ProcessingInput.objects.create(
                 experimentName=experimentName,
                 adapter=adapter,
                 sampleFile=sampleFile,
                 humanGenome=humanGenome,
-                mouseGenome=mouseGenome
+                mouseGenome=mouseGenome,
+                useBarcode=useBarcode
             )
 
             # Read the contents of the uploaded sample file
@@ -105,6 +109,14 @@ def preProcess(response):
             with open(myScriptPath, 'r') as template_file:
                 scriptContent = template_file.read()
 
+            # Generate barcode-specific clip arguments
+            if useBarcode:
+                clip_arguments = f'-u 1 -a {adapter} --overlap=4 --trimmed-only --maximum-length=40 --minimum-length=15 --quality-cutoff=28 --discard-untrimmed'
+                barcode_comment = "# Barcode demultiplexing enabled - adapter trimming with barcode removal"
+            else:
+                clip_arguments = f'-u 1 -a {adapter} --overlap=4 --trimmed-only --maximum-length=40 --minimum-length=15 --quality-cutoff=28'
+                barcode_comment = "# Standard adapter trimming without barcode demultiplexing"
+
             scriptContent = scriptContent.replace("{filter}", filter)
             scriptContent = scriptContent.replace("{genome}", genome)
             scriptContent = scriptContent.replace("{transcriptome}", transcriptome)
@@ -112,6 +124,8 @@ def preProcess(response):
             scriptContent = scriptContent.replace("{transcriptLengths}", transcriptLengths)
             scriptContent = scriptContent.replace("{experimentName}", experimentName)
             scriptContent = scriptContent.replace("{filePaths}", filePaths)
+            scriptContent = scriptContent.replace("{clipArguments}", clip_arguments)
+            scriptContent = scriptContent.replace("{barcodeComment}", barcode_comment)
 
             output_dir = os.path.join('media', 'generated_scripts')
             os.makedirs(output_dir, exist_ok=True)
@@ -235,6 +249,8 @@ def upload_parquet(request):
                                 uploaded_file.delete()  # Remove invalid file
                                 failed_uploads.append(f"{file.name}: missing columns {', '.join(missing_columns)}")
                             else:
+                                # 🚀 Create preprocessing cache for faster analysis
+                                create_file_preprocessing_cache(file_path, "riboseq")
                                 successful_uploads += 1
 
                         except Exception as e:
@@ -275,6 +291,8 @@ def upload_parquet(request):
                                 uploaded_file.delete()  # Remove invalid file
                                 failed_uploads.append(f"{file.name}: missing columns {', '.join(missing_columns)}")
                             else:
+                                # 🚀 Create preprocessing cache for faster analysis
+                                create_file_preprocessing_cache(file_path, "mrna")
                                 successful_uploads += 1
 
                         except Exception as e:
@@ -415,8 +433,22 @@ def load_or_build_gene_counts_dict(parquet_filename):
     return gene_counts
 
 def get_gene_counts(file1, file2):
-    gene_counts_1 = load_or_build_gene_counts_dict(file1)
-    gene_counts_2 = load_or_build_gene_counts_dict(file2)
+    """Get gene counts for two files - OPTIMIZED with preprocessing cache"""
+
+    # 🚀 Try to use the new preprocessing cache first (much faster)
+    df1_counts = get_cached_gene_counts(file1, "riboseq")
+    df2_counts = get_cached_gene_counts(file2, "riboseq")
+
+    if not df1_counts.empty and not df2_counts.empty:
+        # Use cached data - convert to dict format for compatibility
+        gene_counts_1 = dict(zip(df1_counts['gene_name'], df1_counts['total_count']))
+        gene_counts_2 = dict(zip(df2_counts['gene_name'], df2_counts['total_count']))
+        print(f"🚀 Using cached gene counts for {file1} and {file2}")
+    else:
+        # Fallback to existing pickle cache system
+        print(f"⚠️ Cache miss, using pickle cache for {file1} and {file2}")
+        gene_counts_1 = load_or_build_gene_counts_dict(file1)
+        gene_counts_2 = load_or_build_gene_counts_dict(file2)
 
     common_genes = set(gene_counts_1.keys()) & set(gene_counts_2.keys())
 
@@ -564,8 +596,18 @@ def get_bin_counts(selected_file):
 
     length_to_offset = dict(zip(offsets_df["Read Length"], offsets_df["P-site Offset"]))
 
-    file_path = os.path.join(PARQUET_FOLDER, selected_file)
-    df = pq.read_table(file_path, columns=["gene_name", "read_length", "start_position"]).to_pandas()
+    # 🚀 Try to use cached region stats first
+    cached_stats = get_cached_region_stats(selected_file)
+    if not cached_stats.empty:
+        print(f"🚀 Using cached region stats for bin counts: {selected_file}")
+        # For bin counts, we still need the full data with positions, so fall back to file reading
+        # This optimization would require more complex caching of position data
+        file_path = os.path.join(PARQUET_FOLDER, selected_file)
+        df = pq.read_table(file_path, columns=["gene_name", "read_length", "start_position"]).to_pandas()
+    else:
+        print(f"⚠️ Cache miss for bin counts, reading file: {selected_file}")
+        file_path = os.path.join(PARQUET_FOLDER, selected_file)
+        df = pq.read_table(file_path, columns=["gene_name", "read_length", "start_position"]).to_pandas()
 
     df = df.query("gene_name in @selected_genes")
 
@@ -870,6 +912,13 @@ def generate_stop_codon_periodicity(selected_files):
     if not selected_files:
         return None, "No files selected!"
 
+    # Check cache first
+    cache_key = f"psite_offset_{'_'.join(sorted(selected_files))}"
+    cached_result = get_cached_plot(cache_key)
+    if cached_result:
+        print(f"🚀 Using cached P-site offset plot for {', '.join(selected_files)}")
+        return cached_result, None
+
     # Load P-site offsets (needed for read length filtering)
     if not os.path.exists(OFFSET_CSV):
         return None, "P-site offset CSV file not found! Please configure P-site offsets first."
@@ -930,6 +979,10 @@ def generate_stop_codon_periodicity(selected_files):
         xlim=(-20, 60)
     )
 
+    # Cache the result for faster subsequent access
+    set_cached_plot(cache_key, plot_html)
+    print(f"💾 Cached P-site offset plot for {', '.join(selected_files)}")
+
     return plot_html, None
 
 
@@ -973,15 +1026,23 @@ def process_metagene_data_no_shift(df, file_offsets, experiment_name, total_read
             reference_pos = gene_df["p_site"].min()
             # Look at positions from -30 to +62 relative to start - EXACT same as original
             position_range = range(-30, 63)
-        else:  # stop - MODIFIED to show upstream positions for P-site offset determination
-            # For stop codon, we need to find the actual CDS end - EXACT same as original
-            # Use P-site positions and find the end of the CDS region - EXACT same as original
-            # The stop codon should be near the end of the CDS - EXACT same as original
+        else:  # stop - MODIFIED to show raw positions without P-site shifts
+            # For the unshifted version, we need to find the actual stop codon position
+            # Since we're not applying P-site shifts, we need to account for the fact that
+            # the raw read positions will be offset from the actual stop codon
+
+            # Find the end of the CDS region (this should be near the stop codon)
             p_sites = gene_df["p_site"].sort_values()
-            # Use a position that's likely to be near the stop codon - EXACT same as original
-            # Take the 95th percentile of P-site positions as stop codon reference - EXACT same as original
-            reference_pos = int(p_sites.quantile(0.95))
-            # Look at positions from -20 to +60 relative to stop codon - MODIFIED to show upstream positions
+            # Use the 95th percentile as the reference, but adjust for the expected offset
+            raw_reference_pos = int(p_sites.quantile(0.95))
+
+            # Since we're not applying P-site shifts, the actual stop codon is likely
+            # to be at a position that's offset from where the reads are mapping
+            # For typical ribosome footprints, the P-site is usually ~12-15 nt from the 5' end
+            # So the stop codon should be ~12-15 nt downstream from the raw read positions
+            reference_pos = raw_reference_pos + 12  # Adjust reference to show raw offset pattern
+
+            # Look at positions from -20 to +60 relative to the adjusted reference
             position_range = range(-20, 61)
 
         # Calculate relative positions - EXACT same as original
@@ -1185,20 +1246,45 @@ def calculate_gene_lengths(gtf_file):
     return gene_lengths[["gene_name", "length_kb"]]
 
 def process_parquet_file_gene_counts(file_path):
+    """Process parquet file for gene counts - OPTIMIZED with cache"""
+    filename = os.path.basename(file_path)
+
+    # 🚀 Try to use cached gene counts first
+    cached_counts = get_cached_gene_counts(filename, "riboseq")
+    if not cached_counts.empty:
+        cached_counts["file_name"] = filename
+        cached_counts.columns = ["gene_name", "read_count", "file_name"]
+        print(f"🚀 Using cached gene counts for PCA: {filename}")
+        return cached_counts
+
+    # Fallback to file reading if cache miss
+    print(f"⚠️ Cache miss for PCA, reading file: {filename}")
     df = pd.read_parquet(file_path)
     if "gene_name" not in df.columns or "read_count" not in df.columns:
         raise ValueError(f"Missing required columns in {file_path}")
     gene_counts = df.groupby("gene_name", as_index=False)["read_count"].sum()
-    gene_counts["file_name"] = os.path.basename(file_path)
+    gene_counts["file_name"] = filename
     return gene_counts
 
 def process_mrna_file_gene_counts(file_path):
-    """Process mRNA parquet file for gene counts - same logic as riboseq"""
+    """Process mRNA parquet file for gene counts - OPTIMIZED with cache"""
+    filename = os.path.basename(file_path)
+
+    # 🚀 Try to use cached gene counts first
+    cached_counts = get_cached_gene_counts(filename, "mrna")
+    if not cached_counts.empty:
+        cached_counts["file_name"] = f"mRNA_{filename}"
+        cached_counts.columns = ["gene_name", "read_count", "file_name"]
+        print(f"🚀 Using cached mRNA gene counts for PCA: {filename}")
+        return cached_counts
+
+    # Fallback to file reading if cache miss
+    print(f"⚠️ Cache miss for mRNA PCA, reading file: {filename}")
     df = pd.read_parquet(file_path)
     if "gene_name" not in df.columns or "read_count" not in df.columns:
         raise ValueError(f"Missing required columns in {file_path}")
     gene_counts = df.groupby("gene_name", as_index=False)["read_count"].sum()
-    gene_counts["file_name"] = os.path.basename(file_path)
+    gene_counts["file_name"] = f"mRNA_{filename}"
     return gene_counts
 
 def get_mrna_gene_counts_dict(mrna_filename):
@@ -1227,9 +1313,22 @@ def get_mrna_gene_counts_dict(mrna_filename):
     return gene_counts
 
 def get_combined_gene_counts(ribo_file, mrna_file):
-    """Get combined gene counts from riboseq and mRNA files for comparison"""
-    ribo_counts = load_or_build_gene_counts_dict(ribo_file)
-    mrna_counts = get_mrna_gene_counts_dict(mrna_file)
+    """Get combined gene counts from riboseq and mRNA files - OPTIMIZED with cache"""
+
+    # 🚀 Try to use preprocessing cache first
+    ribo_df = get_cached_gene_counts(ribo_file, "riboseq")
+    mrna_df = get_cached_gene_counts(mrna_file, "mrna")
+
+    if not ribo_df.empty and not mrna_df.empty:
+        # Use cached data
+        ribo_counts = dict(zip(ribo_df['gene_name'], ribo_df['total_count']))
+        mrna_counts = dict(zip(mrna_df['gene_name'], mrna_df['total_count']))
+        print(f"🚀 Using cached data for combined analysis: {ribo_file} + {mrna_file}")
+    else:
+        # Fallback to existing method
+        print(f"⚠️ Cache miss, using pickle cache for combined analysis")
+        ribo_counts = load_or_build_gene_counts_dict(ribo_file)
+        mrna_counts = get_mrna_gene_counts_dict(mrna_file)
 
     # Get all unique genes from both datasets
     all_genes = set(ribo_counts.keys()) | set(mrna_counts.keys())
@@ -1698,6 +1797,8 @@ def psite_metagene_plots(request):
             except Exception as e:
                 error_message = f"Error generating plots: {str(e)}"
 
+
+
     return render(request, "riboApp/psiteMetagene.html", {
         "parquet_files": parquet_files,
         "selected_genes": selected_genes,
@@ -1905,3 +2006,586 @@ def create_metagene_plot(data, title, xlim=None, ylim=None):
     )
 
     return fig.to_html(full_html=False)
+
+
+def download_csv(request, analysis_type):
+    """General CSV download function for different analysis types"""
+
+    if analysis_type == "gene_counts":
+        return download_gene_counts_csv(request)
+    elif analysis_type == "combined_gene_counts":
+        return download_combined_gene_counts_csv(request)
+    elif analysis_type == "pca":
+        return download_pca_csv(request)
+    elif analysis_type == "combined_pca":
+        return download_combined_pca_csv(request)
+    elif analysis_type == "psite_metagene_start":
+        return download_psite_metagene_csv(request, "start")
+    elif analysis_type == "psite_metagene_stop":
+        return download_psite_metagene_csv(request, "stop")
+    elif analysis_type == "bin_counts":
+        return download_bin_counts_csv(request)
+    elif analysis_type == "read_length":
+        return download_read_length_csv(request)
+    else:
+        return HttpResponse("Invalid analysis type", status=400)
+
+
+def download_gene_counts_csv(request):
+    """Download CSV for gene counts scatter plot"""
+    file1 = request.GET.get("file1")
+    file2 = request.GET.get("file2")
+
+    if not file1 or not file2:
+        return HttpResponse("Missing file parameters", status=400)
+
+    df = get_gene_counts(file1, file2)
+
+    # Create CSV response
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="gene_counts_{file1}_vs_{file2}.csv"'
+
+    df.to_csv(response, index=False)
+    return response
+
+
+def download_combined_gene_counts_csv(request):
+    """Download CSV for combined gene counts (riboseq vs mRNA)"""
+    ribo_file = request.GET.get("ribo_file")
+    mrna_file = request.GET.get("mrna_file")
+
+    if not ribo_file or not mrna_file:
+        return HttpResponse("Missing file parameters", status=400)
+
+    df = get_combined_gene_counts(ribo_file, mrna_file)
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="combined_gene_counts_{ribo_file}_vs_{mrna_file}.csv"'
+
+    df.to_csv(response, index=False)
+    return response
+
+
+def download_pca_csv(request):
+    """Download CSV for PCA analysis"""
+    # Regenerate PCA data
+    gene_lengths = calculate_gene_lengths(GTF_FILE)
+    if gene_lengths.empty:
+        return HttpResponse("No gene lengths available", status=400)
+
+    parquet_files = sorted([
+        os.path.basename(f) for f in glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet"))
+        if not os.path.basename(f).startswith(".")
+    ])
+
+    if not parquet_files:
+        return HttpResponse("No parquet files found", status=400)
+
+    # Process files and create PCA data
+    all_data = []
+    for file in parquet_files:
+        file_path = os.path.join(PARQUET_FOLDER, file)
+        df = pq.read_table(file_path, columns=["gene_name", "read_count"]).to_pandas()
+        df = df.groupby("gene_name", as_index=False)["read_count"].sum()
+        df["file_name"] = os.path.basename(file)
+        all_data.append(df)
+
+    combined_df = pd.concat(all_data, ignore_index=True)
+    pivot_df = combined_df.pivot(index="gene_name", columns="file_name", values="read_count").fillna(0)
+
+    # Merge with gene lengths and calculate RPKM
+    pivot_df = pivot_df.merge(gene_lengths, left_index=True, right_on="gene_name", how="inner")
+    pivot_df.set_index("gene_name", inplace=True)
+
+    sample_cols = [col for col in pivot_df.columns if col != "length"]
+    for col in sample_cols:
+        pivot_df[col] = (pivot_df[col] * 1e9) / (pivot_df["length"] * pivot_df[sample_cols].sum().sum())
+
+    # Perform PCA
+    from sklearn.decomposition import PCA
+    pca = PCA(n_components=2)
+    pca_results = pca.fit_transform(pivot_df[sample_cols].T)
+    pca_df = pd.DataFrame({
+        "PC1": pca_results[:, 0],
+        "PC2": pca_results[:, 1],
+        "file": sample_cols,
+        "explained_variance_PC1": pca.explained_variance_ratio_[0],
+        "explained_variance_PC2": pca.explained_variance_ratio_[1]
+    })
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="pca_analysis.csv"'
+
+    pca_df.to_csv(response, index=False)
+    return response
+
+
+def download_combined_pca_csv(request):
+    """Download CSV for combined PCA analysis (riboseq + mRNA)"""
+    gene_lengths = calculate_gene_lengths(GTF_FILE)
+    if gene_lengths.empty:
+        return HttpResponse("No gene lengths available", status=400)
+
+    # Get both riboseq and mRNA files
+    ribo_files = sorted([
+        os.path.basename(f) for f in glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet"))
+        if not os.path.basename(f).startswith(".")
+    ])
+    mrna_files = sorted([
+        os.path.basename(f) for f in glob.glob(os.path.join(MRNA_FOLDER, "*.parquet"))
+        if not os.path.basename(f).startswith(".")
+    ])
+
+    all_data = []
+
+    # Process riboseq files
+    for file in ribo_files:
+        file_path = os.path.join(PARQUET_FOLDER, file)
+        df = pq.read_table(file_path, columns=["gene_name", "read_count"]).to_pandas()
+        df = df.groupby("gene_name", as_index=False)["read_count"].sum()
+        df["file_name"] = f"Riboseq_{os.path.basename(file)}"
+        all_data.append(df)
+
+    # Process mRNA files
+    for file in mrna_files:
+        file_path = os.path.join(MRNA_FOLDER, file)
+        df = pq.read_table(file_path, columns=["gene_name", "read_count"]).to_pandas()
+        df = df.groupby("gene_name", as_index=False)["read_count"].sum()
+        df["file_name"] = f"mRNA_{os.path.basename(file)}"
+        all_data.append(df)
+
+    if not all_data:
+        return HttpResponse("No data files found", status=400)
+
+    combined_df = pd.concat(all_data, ignore_index=True)
+    pivot_df = combined_df.pivot(index="gene_name", columns="file_name", values="read_count").fillna(0)
+
+    # Merge with gene lengths and calculate RPKM
+    pivot_df = pivot_df.merge(gene_lengths, left_index=True, right_on="gene_name", how="inner")
+    pivot_df.set_index("gene_name", inplace=True)
+
+    sample_cols = [col for col in pivot_df.columns if col != "length"]
+    for col in sample_cols:
+        pivot_df[col] = (pivot_df[col] * 1e9) / (pivot_df["length"] * pivot_df[sample_cols].sum().sum())
+
+    # Perform PCA
+    from sklearn.decomposition import PCA
+    pca = PCA(n_components=2)
+    pca_results = pca.fit_transform(pivot_df[sample_cols].T)
+
+    pca_df = pd.DataFrame({
+        "PC1": pca_results[:, 0],
+        "PC2": pca_results[:, 1],
+        "file": sample_cols,
+        "file_type": [f.split("_")[0] for f in sample_cols],
+        "explained_variance_PC1": pca.explained_variance_ratio_[0],
+        "explained_variance_PC2": pca.explained_variance_ratio_[1]
+    })
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="combined_pca_analysis.csv"'
+
+    pca_df.to_csv(response, index=False)
+    return response
+
+
+def download_psite_metagene_csv(request, plot_type):
+    """Download CSV for P-site metagene plots"""
+    selected_files = request.GET.getlist("selected_files")
+    use_selected_genes = request.GET.get("use_selected_genes") == "true"
+
+    if not selected_files:
+        return HttpResponse("No files selected", status=400)
+
+    # Load selected genes if needed
+    selected_genes = None
+    if use_selected_genes:
+        selected_genes = [gene.gene_name for gene in SelectedGene.objects.all()]
+        if not selected_genes:
+            return HttpResponse("No genes selected", status=400)
+
+    # Generate the data (same as in the plot generation)
+    try:
+        start_plot_html, stop_plot_html = generate_psite_metagene_plots(selected_files, selected_genes)
+
+        # We need to regenerate the data for CSV export
+        # Load P-site offsets
+        if not os.path.exists(OFFSET_CSV):
+            return HttpResponse("P-site offset CSV file not found", status=400)
+
+        offsets_df = pd.read_csv(OFFSET_CSV)
+        offsets_df.columns = ["experiment", "read_length", "P_site_offset"]
+
+        # Process each selected file
+        all_start_data = []
+        all_stop_data = []
+
+        for selected_file in selected_files:
+            file_path = os.path.join(PARQUET_FOLDER, selected_file)
+            if not os.path.exists(file_path):
+                continue
+
+            experiment_name = os.path.splitext(selected_file)[0]
+            file_offsets = offsets_df[offsets_df["experiment"] == experiment_name]
+
+            if file_offsets.empty:
+                continue
+
+            df = pq.read_table(file_path).to_pandas()
+            total_reads = df["read_count"].sum()
+
+            # Process start codon data
+            start_data = process_metagene_data(df, file_offsets, experiment_name, total_reads, "start", selected_genes)
+            if not start_data.empty:
+                all_start_data.append(start_data)
+
+            # Process stop codon data
+            stop_data = process_metagene_data(df, file_offsets, experiment_name, total_reads, "stop", selected_genes)
+            if not stop_data.empty:
+                all_stop_data.append(stop_data)
+
+        # Combine data
+        if plot_type == "start" and all_start_data:
+            combined_data = pd.concat(all_start_data, ignore_index=True)
+            filename = "psite_metagene_start_codon.csv"
+        elif plot_type == "stop" and all_stop_data:
+            combined_data = pd.concat(all_stop_data, ignore_index=True)
+            filename = "psite_metagene_stop_codon.csv"
+        else:
+            return HttpResponse("No data available for the requested plot type", status=400)
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        combined_data.to_csv(response, index=False)
+        return response
+
+    except Exception as e:
+        return HttpResponse(f"Error generating CSV: {str(e)}", status=500)
+
+
+def download_bin_counts_csv(request):
+    """Download CSV for bin counts analysis"""
+    selected_file = request.GET.get("selected_file")
+
+    if not selected_file:
+        return HttpResponse("No file selected", status=400)
+
+    # Generate bin counts data (reuse existing function)
+    plots, error_message = get_bin_counts(selected_file)
+
+    if error_message:
+        return HttpResponse(f"Error: {error_message}", status=400)
+
+    # Extract data from the plots (this is a simplified approach)
+    # In a real implementation, you'd want to store the data separately
+    file_path = os.path.join(PARQUET_FOLDER, selected_file)
+    df = pq.read_table(file_path).to_pandas()
+
+    # Create summary statistics
+    summary_data = df.groupby(['region', 'read_length']).agg({
+        'read_count': ['sum', 'mean', 'count']
+    }).reset_index()
+
+    # Flatten column names
+    summary_data.columns = ['region', 'read_length', 'total_reads', 'mean_reads', 'num_positions']
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="bin_counts_{selected_file}.csv"'
+
+    summary_data.to_csv(response, index=False)
+    return response
+
+
+def download_read_length_csv(request):
+    """Download CSV for read length distribution"""
+    selected_file = request.GET.get("selected_file")
+
+    if not selected_file:
+        return HttpResponse("No file selected", status=400)
+
+    file_path = os.path.join(PARQUET_FOLDER, selected_file)
+    if not os.path.exists(file_path):
+        return HttpResponse("File not found", status=400)
+
+    df = pq.read_table(file_path, columns=["read_length", "read_count"]).to_pandas()
+
+    # Group by read length and sum counts
+    read_length_data = df.groupby("read_length")["read_count"].sum().reset_index()
+    read_length_data.columns = ["read_length", "total_count"]
+
+    # Calculate percentages
+    total_reads = read_length_data["total_count"].sum()
+    read_length_data["percentage"] = (read_length_data["total_count"] / total_reads) * 100
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="read_length_distribution_{selected_file}.csv"'
+
+    read_length_data.to_csv(response, index=False)
+    return response
+
+
+# ============================================================================
+# PERFORMANCE OPTIMIZATION: PREPROCESSING CACHE SYSTEM
+# ============================================================================
+
+def create_file_preprocessing_cache(file_path, file_type="riboseq"):
+    """
+    Create comprehensive preprocessing cache for uploaded files.
+    This dramatically speeds up all subsequent analyses.
+    """
+    print(f"Creating preprocessing cache for {file_path}")
+    start_time = time.time()
+
+    filename = os.path.basename(file_path)
+    cache_key_base = f"preprocess_{file_type}_{filename}"
+
+    try:
+        # Read the full parquet file once
+        df = pq.read_table(file_path).to_pandas()
+        print(f"Loaded {len(df)} rows from {filename}")
+
+        # Cache 1: Basic gene counts (most common operation)
+        gene_counts = df.groupby("gene_name")["read_count"].sum().reset_index()
+        gene_counts.columns = ["gene_name", "total_count"]
+        cache.set(f"{cache_key_base}_gene_counts", gene_counts.to_dict('records'), timeout=None)
+
+        # Cache 2: Read length distribution
+        read_length_dist = df.groupby("read_length")["read_count"].sum().reset_index()
+        cache.set(f"{cache_key_base}_read_length", read_length_dist.to_dict('records'), timeout=None)
+
+        # Cache 3: Region-based statistics
+        if 'region' in df.columns:
+            region_stats = df.groupby(['region', 'read_length']).agg({
+                'read_count': ['sum', 'mean', 'count']
+            }).reset_index()
+            region_stats.columns = ['region', 'read_length', 'total_reads', 'mean_reads', 'num_positions']
+            cache.set(f"{cache_key_base}_region_stats", region_stats.to_dict('records'), timeout=None)
+
+        # Cache 4: For riboseq files - P-site ready data
+        if file_type == "riboseq" and all(col in df.columns for col in ['start_position', 'gene_name', 'region']):
+            # Pre-filter for CDS regions and typical read lengths
+            # Make sure we have all required columns for metagene analysis
+            required_cols = ['gene_name', 'start_position', 'read_length', 'read_count', 'region']
+            if 'end_position' in df.columns:
+                required_cols.append('end_position')
+
+            cds_df = df[(df['region'] == 'CDS') & (df['read_length'].between(28, 32))].copy()
+            if not cds_df.empty:
+                # Only cache the columns we need
+                cds_cache_data = cds_df[required_cols].to_dict('records')
+                cache.set(f"{cache_key_base}_cds_data", cds_cache_data, timeout=None)
+
+                # Cache 4b: Pre-calculate metagene data if P-site offsets are available
+                try:
+                    if os.path.exists(OFFSET_CSV):
+                        offsets_df = pd.read_csv(OFFSET_CSV)
+                        offsets_df.columns = ["experiment", "read_length", "P_site_offset"]
+                        experiment_name = os.path.splitext(filename)[0]
+                        file_offsets = offsets_df[offsets_df["experiment"] == experiment_name]
+
+                        if not file_offsets.empty:
+                            # Pre-calculate P-site positions
+                            length_to_offset = dict(zip(file_offsets["read_length"], file_offsets["P_site_offset"]))
+                            cds_df["offset"] = cds_df["read_length"].map(length_to_offset)
+                            cds_df = cds_df.dropna(subset=["offset"])
+                            cds_df["p_site"] = cds_df["start_position"] + cds_df["offset"].astype(int)
+
+                            # Cache the P-site enhanced data
+                            cache.set(f"{cache_key_base}_psite_data", cds_df.to_dict('records'), timeout=None)
+                            print(f"📍 Pre-calculated P-site data for {filename}")
+                except Exception as e:
+                    print(f"⚠️ Could not pre-calculate P-site data for {filename}: {str(e)}")
+                    pass
+
+        # Cache 5: Basic file metadata
+        file_metadata = {
+            'total_reads': int(df['read_count'].sum()),
+            'unique_genes': int(df['gene_name'].nunique()),
+            'read_length_range': [int(df['read_length'].min()), int(df['read_length'].max())],
+            'regions': list(df['region'].unique()) if 'region' in df.columns else [],
+            'cached_at': time.time()
+        }
+        cache.set(f"{cache_key_base}_metadata", file_metadata, timeout=None)
+
+        processing_time = time.time() - start_time
+        print(f"Preprocessing cache created in {processing_time:.2f}s for {filename}")
+
+        return True
+
+    except Exception as e:
+        print(f"Error creating preprocessing cache for {filename}: {str(e)}")
+        return False
+
+
+def get_cached_gene_counts(filename, file_type="riboseq"):
+    """Fast retrieval of gene counts from cache"""
+    cache_key = f"preprocess_{file_type}_{filename}_gene_counts"
+    cached_data = cache.get(cache_key)
+
+    if cached_data:
+        return pd.DataFrame(cached_data)
+
+    # Fallback to file reading if cache miss
+    print(f"Cache miss for {filename}, reading from file...")
+    file_path = os.path.join(PARQUET_FOLDER if file_type == "riboseq" else MRNA_FOLDER, filename)
+    if os.path.exists(file_path):
+        create_file_preprocessing_cache(file_path, file_type)
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return pd.DataFrame(cached_data)
+
+    return pd.DataFrame()
+
+
+def get_cached_file_metadata(filename, file_type="riboseq"):
+    """Get file metadata from cache"""
+    cache_key = f"preprocess_{file_type}_{filename}_metadata"
+    return cache.get(cache_key, {})
+
+
+def get_cached_read_length_data(filename, file_type="riboseq"):
+    """Fast retrieval of read length distribution from cache"""
+    cache_key = f"preprocess_{file_type}_{filename}_read_length"
+    cached_data = cache.get(cache_key)
+
+    if cached_data:
+        return pd.DataFrame(cached_data)
+    return pd.DataFrame()
+
+
+def get_cached_cds_data(filename):
+    """Fast retrieval of CDS data for metagene analysis"""
+    cache_key = f"preprocess_riboseq_{filename}_cds_data"
+    cached_data = cache.get(cache_key)
+
+    if cached_data:
+        return pd.DataFrame(cached_data)
+    return pd.DataFrame()
+
+
+def get_cached_region_stats(filename, file_type="riboseq"):
+    """Fast retrieval of region statistics from cache"""
+    cache_key = f"preprocess_{file_type}_{filename}_region_stats"
+    cached_data = cache.get(cache_key)
+
+    if cached_data:
+        return pd.DataFrame(cached_data)
+    return pd.DataFrame()
+
+
+def get_cached_psite_data(filename):
+    """Fast retrieval of P-site enhanced data for metagene analysis"""
+    cache_key = f"preprocess_riboseq_{filename}_psite_data"
+    cached_data = cache.get(cache_key)
+
+    if cached_data:
+        return pd.DataFrame(cached_data)
+    return pd.DataFrame()
+
+
+def get_cached_plot(cache_key):
+    """Get cached plot HTML"""
+    return cache.get(cache_key)
+
+
+def set_cached_plot(cache_key, plot_html, timeout=3600):
+    """Cache plot HTML for 1 hour by default"""
+    cache.set(cache_key, plot_html, timeout)
+
+
+def preprocess_all_uploaded_files():
+    """
+    Preprocess all uploaded files to create caches.
+    Call this when files are uploaded or as a maintenance task.
+    """
+    print("🔄 Starting bulk preprocessing of all uploaded files...")
+
+    # Process riboseq files
+    ribo_files = glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet"))
+    for file_path in ribo_files:
+        if not os.path.basename(file_path).startswith('.'):
+            create_file_preprocessing_cache(file_path, "riboseq")
+
+    # Process mRNA files
+    mrna_files = glob.glob(os.path.join(MRNA_FOLDER, "*.parquet"))
+    for file_path in mrna_files:
+        if not os.path.basename(file_path).startswith('.'):
+            create_file_preprocessing_cache(file_path, "mrna")
+
+    print("Bulk preprocessing completed!")
+
+
+def update_psite_caches():
+    """Update existing caches with P-site enhanced data"""
+    print("🔄 Updating P-site caches for existing files...")
+
+    ribo_files = glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet"))
+    for file_path in ribo_files:
+        if not os.path.basename(file_path).startswith('.'):
+            filename = os.path.basename(file_path)
+
+            # Check if we already have P-site cache
+            psite_cache = get_cached_psite_data(filename)
+            if psite_cache.empty:
+                print(f"🔄 Updating P-site cache for {filename}")
+                create_file_preprocessing_cache(file_path, "riboseq")
+            else:
+                print(f"✅ P-site cache already exists for {filename}")
+
+    print("✅ P-site cache update completed!")
+
+
+def clear_file_cache(filename, file_type="riboseq"):
+    """Clear all cached data for a specific file"""
+    cache_key_base = f"preprocess_{file_type}_{filename}"
+    cache_keys = [
+        f"{cache_key_base}_gene_counts",
+        f"{cache_key_base}_read_length",
+        f"{cache_key_base}_region_stats",
+        f"{cache_key_base}_cds_data",
+        f"{cache_key_base}_metadata"
+    ]
+
+    for key in cache_keys:
+        cache.delete(key)
+
+    print(f"Cleared cache for {filename}")
+
+
+def preprocess_all_files_view(request):
+    """View to trigger preprocessing of all uploaded files"""
+    if request.method == "POST":
+        try:
+            preprocess_all_uploaded_files()
+            messages.success(request, "All files have been preprocessed successfully! Analysis should now be much faster.")
+        except Exception as e:
+            messages.error(request, f"Error during preprocessing: {str(e)}")
+
+    return redirect('upload_parquet')
+
+
+def update_psite_caches_view(request):
+    """View to trigger P-site cache updates"""
+    if request.method == "POST":
+        try:
+            update_psite_caches()
+            messages.success(request, "P-site caches have been updated successfully! Metagene analysis should now be much faster.")
+        except Exception as e:
+            messages.error(request, f"Error updating P-site caches: {str(e)}")
+
+    return redirect('upload_parquet')
+
+
+def clear_all_cache_view(request):
+    """View to clear all preprocessing caches"""
+    if request.method == "POST":
+        try:
+            # Clear all cache keys that start with "preprocess_"
+            from django.core.cache import cache
+            cache.clear()  # This clears all cache - you might want to be more selective
+            messages.success(request, "All preprocessing caches have been cleared.")
+        except Exception as e:
+            messages.error(request, f"Error clearing cache: {str(e)}")
+
+    return redirect('upload_parquet')

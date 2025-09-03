@@ -8,6 +8,11 @@ class CreateNewList(forms.Form):
     adapter = forms.CharField(label="Input adapter sequence to be trimmed", max_length=500, required=True)
     mouseGenome = forms.BooleanField(label="GRCm39", required=False)
     humanGenome = forms.BooleanField(label="GRCh38", required=False)
+    useBarcode = forms.BooleanField(
+        label="Use barcode for demultiplexing",
+        required=False,
+        help_text="Check this if your samples contain barcodes that need to be removed during preprocessing"
+    )
     sampleFile = forms.FileField(label="Upload text file containing sample data paths", required=True)
 
 

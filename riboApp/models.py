@@ -24,6 +24,7 @@ class ProcessingInput(models.Model):
     mouseGenome = models.BooleanField()
     #TODO get rid of hunan line just look if mouse is true or false
     humanGenome = models.BooleanField()
+    useBarcode = models.BooleanField(default=False)
     sampleFile = models.FileField(upload_to='uploads/')
 
     def __str__(self):

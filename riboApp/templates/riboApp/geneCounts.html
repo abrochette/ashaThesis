@@ -28,6 +28,12 @@
 
 <div id="plot-container">
     {% if plot_div %}
+        <div style="margin-bottom: 15px;">
+            <a href="{% url 'download_csv' 'gene_counts' %}?file1={{ file1 }}&file2={{ file2 }}"
+               style="background-color: #28a745; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                📊 Download Plot Data as CSV
+            </a>
+        </div>
         <div>{{ plot_div|safe }}</div>  <!-- Render Plotly figure -->
     {% else %}
         <p>No plot generated yet.</p>

@@ -2,5 +2,11 @@
 
 {% block content %}
     <h1>PCA of Gene Counts</h1>
+    <div style="margin-bottom: 15px;">
+        <a href="{% url 'download_csv' 'pca' %}"
+           style="background-color: #28a745; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            📊 Download PCA Data as CSV
+        </a>
+    </div>
     <div>{{ pca_plot|safe }}</div>
 {% endblock %}

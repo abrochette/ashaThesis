@@ -23,6 +23,12 @@
 
     <div id="plots">
         {% if plots %}
+            <div style="margin-bottom: 15px;">
+                <a href="{% url 'download_csv' 'bin_counts' %}?selected_file={{ selected_file }}"
+                   style="background-color: #28a745; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                    📊 Download Bin Counts Data as CSV
+                </a>
+            </div>
             {{ plots|safe }}
         {% endif %}
     </div>

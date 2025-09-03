@@ -28,6 +28,12 @@ urlpatterns = [
     path("combined_pca/", views.combined_pca_gene_counts, name="combined_pca_plot"),
     # P-site metagene analysis
     path("psite_metagene/", views.psite_metagene_plots, name="psite_metagene"),
+    # CSV download endpoints
+    path("download_csv/<str:analysis_type>/", views.download_csv, name="download_csv"),
+    # Performance optimization endpoints
+    path("preprocess_all_files/", views.preprocess_all_files_view, name="preprocess_all_files"),
+    path("update_psite_caches/", views.update_psite_caches_view, name="update_psite_caches"),
+    path("clear_all_cache/", views.clear_all_cache_view, name="clear_all_cache"),
 ]
 
 if settings.DEBUG:

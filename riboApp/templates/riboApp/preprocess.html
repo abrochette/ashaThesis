@@ -29,6 +29,7 @@
         <p><strong>Adapter sequence: </strong> {{ input.adapter }}</p>
         <p><strong>GRCm39: </strong> {{ input.mouseGenome|yesno:"Yes,No" }}</p>
         <p><strong>GRCh38: </strong> {{ input.humanGenome|yesno:"Yes,No" }}</p>
+        <p><strong>Use Barcode: </strong> {{ input.useBarcode|yesno:"Yes,No" }}</p>
         <p><strong>File containing sample data paths: </strong>
         <a href="{% url 'download_file' input.sampleFile.name|slice:"8:" %}">{{ input.sampleFile.name|slice:"8:" }}</a>
         </p>
