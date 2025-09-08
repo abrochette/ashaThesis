@@ -23,6 +23,22 @@
         {% endfor %}
     </select>
 
+    <div style="margin: 15px 0;">
+        <label for="show_regions" style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="show_regions" name="show_regions" value="true">
+            <span>Show regions in different colors</span>
+            <small style="color: #666; margin-left: 10px;">(Color-code by CDS, 5UTR, 3UTR, UNKNOWN)</small>
+        </label>
+    </div>
+
+    <div style="margin: 15px 0;">
+        <label for="cds_only" style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="cds_only" name="cds_only" value="true">
+            <span>Show CDS reads only</span>
+            <small style="color: #666; margin-left: 10px;">(Filter to show only coding sequence reads)</small>
+        </label>
+    </div>
+
     <button type="submit">Generate Plot</button>
 </form>
 

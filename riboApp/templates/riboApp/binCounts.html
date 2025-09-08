@@ -1,7 +1,152 @@
 {% extends 'riboApp/base.html' %}
 
 {% block content %}
-    <h1>Gene Bin Counts</h1>
+    <h1>Gene Bin Counts Analysis</h1>
+
+    <!-- Explanation Section -->
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #007bff;">
+        <h3 style="color: #007bff; margin-top: 0;">📊 What is Bin Counts Analysis?</h3>
+        <p style="margin-bottom: 15px;">
+            <strong>Bin Counts Analysis</strong> examines how ribosome footprint reads are distributed across the coding sequence (CDS) of genes.
+            This analysis helps identify patterns in ribosome density and translation efficiency.
+        </p>
+
+        <h4 style="color: #495057; margin-bottom: 10px;">🔬 How it works:</h4>
+        <ul style="margin-bottom: 15px;">
+            <li><strong>Step 1:</strong> Skip 45 nucleotides from the start codon and 15 nucleotides before the stop codon to avoid edge effects</li>
+            <li><strong>Step 2:</strong> Divide the remaining CDS into 4 equal bins</li>
+            <li><strong>Step 3:</strong> Count ribosome footprint reads in each bin</li>
+            <li><strong>Step 4:</strong> Normalize counts to show the distribution pattern</li>
+        </ul>
+
+        <h4 style="color: #495057; margin-bottom: 10px;">📈 Interpretation:</h4>
+        <ul>
+            <li><strong>Uniform distribution:</strong> Normal, efficient translation</li>
+            <li><strong>Higher density in early bins:</strong> Possible ribosome queuing or slow initiation</li>
+            <li><strong>Higher density in later bins:</strong> Potential ribosome stalling or pausing</li>
+            <li><strong>Irregular patterns:</strong> May indicate regulatory elements or translation control</li>
+        </ul>
+    </div>
+
+    <!-- Visual Diagram -->
+    <div style="text-align: center; margin-bottom: 30px; background-color: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <svg width="100%" height="300" viewBox="0 0 800 300" xmlns="http://www.w3.org/2000/svg" style="max-width: 800px;">
+          <!-- Background -->
+          <rect width="800" height="300" fill="#f8f9fa"/>
+
+          <!-- Title -->
+          <text x="400" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#333">
+            mRNA Structure and CDS Binning for Ribosome Profiling Analysis
+          </text>
+
+          <!-- mRNA strand -->
+          <line x1="50" y1="100" x2="750" y2="100" stroke="#333" stroke-width="3"/>
+
+          <!-- 5' UTR -->
+          <rect x="50" y="85" width="120" height="30" fill="#e6f3ff" stroke="#0066cc" stroke-width="2" rx="5"/>
+          <text x="110" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#0066cc">
+            5' UTR
+          </text>
+
+          <!-- Start Codon -->
+          <rect x="170" y="85" width="40" height="30" fill="#90EE90" stroke="#228B22" stroke-width="2" rx="5"/>
+          <text x="190" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#228B22">
+            START
+          </text>
+          <text x="190" y="125" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#228B22">
+            AUG
+          </text>
+
+          <!-- Skip 5' region (45 nt) -->
+          <rect x="210" y="85" width="60" height="30" fill="#ffeecc" stroke="#ff9900" stroke-width="1" stroke-dasharray="5,5" rx="5"/>
+          <text x="240" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#ff9900">
+            Skip 45nt
+          </text>
+
+          <!-- CDS with 4 bins -->
+          <!-- Bin 1 -->
+          <rect x="270" y="85" width="90" height="30" fill="#0099c6" stroke="#006699" stroke-width="2" rx="5"/>
+          <text x="315" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+            Bin 1
+          </text>
+
+          <!-- Bin 2 -->
+          <rect x="360" y="85" width="90" height="30" fill="#17becf" stroke="#0e8a99" stroke-width="2" rx="5"/>
+          <text x="405" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+            Bin 2
+          </text>
+
+          <!-- Bin 3 -->
+          <rect x="450" y="85" width="90" height="30" fill="#19d3f3" stroke="#0fa0c2" stroke-width="2" rx="5"/>
+          <text x="495" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+            Bin 3
+          </text>
+
+          <!-- Bin 4 -->
+          <rect x="540" y="85" width="90" height="30" fill="#00b5f7" stroke="#0082c6" stroke-width="2" rx="5"/>
+          <text x="585" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">
+            Bin 4
+          </text>
+
+          <!-- Skip 3' region (15 nt) -->
+          <rect x="630" y="85" width="40" height="30" fill="#ffeecc" stroke="#ff9900" stroke-width="1" stroke-dasharray="5,5" rx="5"/>
+          <text x="650" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#ff9900">
+            Skip 15nt
+          </text>
+
+          <!-- Stop Codon -->
+          <rect x="670" y="85" width="40" height="30" fill="#ffb3b3" stroke="#cc0000" stroke-width="2" rx="5"/>
+          <text x="690" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#cc0000">
+            STOP
+          </text>
+          <text x="690" y="125" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#cc0000">
+            UAG/UAA/UGA
+          </text>
+
+          <!-- 3' UTR -->
+          <rect x="710" y="85" width="40" height="30" fill="#e6f3ff" stroke="#0066cc" stroke-width="2" rx="5"/>
+          <text x="730" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#0066cc">
+            3' UTR
+          </text>
+
+          <!-- Labels and arrows -->
+          <!-- CDS label -->
+          <text x="455" y="75" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#333">
+            Coding Sequence (CDS)
+          </text>
+          <line x1="270" y1="78" x2="630" y2="78" stroke="#333" stroke-width="1"/>
+          <polygon points="270,75 275,78 270,81" fill="#333"/>
+          <polygon points="630,75 625,78 630,81" fill="#333"/>
+
+          <!-- Explanation text -->
+          <text x="50" y="160" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#333">
+            Analysis Process:
+          </text>
+          <text x="50" y="180" font-family="Arial, sans-serif" font-size="11" fill="#333">
+            1. Skip 45 nucleotides from start codon and 15 nucleotides before stop codon
+          </text>
+          <text x="50" y="195" font-family="Arial, sans-serif" font-size="11" fill="#333">
+            2. Divide remaining CDS into 4 equal bins
+          </text>
+          <text x="50" y="210" font-family="Arial, sans-serif" font-size="11" fill="#333">
+            3. Count ribosome footprint reads in each bin
+          </text>
+          <text x="50" y="225" font-family="Arial, sans-serif" font-size="11" fill="#333">
+            4. Normalize counts to show read distribution pattern across the gene
+          </text>
+
+          <!-- Legend -->
+          <text x="50" y="255" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#333">
+            Purpose:
+          </text>
+          <text x="50" y="275" font-family="Arial, sans-serif" font-size="11" fill="#333">
+            Reveals ribosome density patterns - uniform distribution indicates normal translation,
+          </text>
+          <text x="50" y="290" font-family="Arial, sans-serif" font-size="11" fill="#333">
+            while skewed patterns may indicate ribosome pausing, stalling, or regulatory elements.
+          </text>
+        </svg>
+    </div>
 
     <form method="POST">
         {% csrf_token %}
@@ -17,17 +162,35 @@
         <button type="submit">Generate Bin Counts</button>
     </form>
 
+    <!-- Important Note -->
+    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+        <h4 style="color: #856404; margin-top: 0;">⚠️ Important Note</h4>
+        <p style="color: #856404; margin-bottom: 0;">
+            This analysis requires <strong>selected genes</strong>. Please make sure you have selected genes of interest
+            using the gene selection feature before running this analysis. The analysis will be performed only on your selected genes.
+        </p>
+    </div>
+
     {% if error_message %}
-        <p style="color: red;">{{ error_message }}</p>
+        <div style="background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #dc3545;">
+            <strong>Error:</strong> {{ error_message }}
+        </div>
     {% endif %}
 
     <div id="plots">
         {% if plots %}
-            <div style="margin-bottom: 15px;">
-                <a href="{% url 'download_csv' 'bin_counts' %}?selected_file={{ selected_file }}"
-                   style="background-color: #28a745; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                    📊 Download Bin Counts Data as CSV
-                </a>
+            <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #28a745;">
+                <h4 style="color: #155724; margin-top: 0;">📊 Analysis Results</h4>
+                <p style="color: #155724; margin-bottom: 15px;">
+                    The plots below show the read distribution across the 4 CDS bins for your selected genes.
+                    Individual gene plots are followed by an averaged normalized distribution across all selected genes.
+                </p>
+                <div style="margin-bottom: 15px;">
+                    <a href="{% url 'download_csv' 'bin_counts' %}?selected_file={{ selected_file }}"
+                       style="background-color: #28a745; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                        📊 Download Bin Counts Data as CSV
+                    </a>
+                </div>
             </div>
             {{ plots|safe }}
         {% endif %}

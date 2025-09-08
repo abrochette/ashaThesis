@@ -1,0 +1,186 @@
+{% extends 'riboApp/base.html' %}
+
+{% block content %}
+    <h1>Delta Analysis - Replicate Comparison</h1>
+
+    <!-- Explanation Section -->
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #007bff;">
+        <h3 style="color: #007bff; margin-top: 0;">📊 What is Delta Analysis?</h3>
+        <p style="margin-bottom: 15px;">
+            <strong>Delta Analysis</strong> compares the differences between replicates in both ribosome profiling and mRNA-seq data. 
+            This analysis helps identify genes with consistent or inconsistent changes across different experimental conditions or replicates.
+        </p>
+        
+        <h4 style="color: #495057; margin-bottom: 10px;">🔬 How it works:</h4>
+        <ul style="margin-bottom: 15px;">
+            <li><strong>X-axis:</strong> Δ Ribo = (Ribo Sample 1 - Ribo Sample 2)</li>
+            <li><strong>Y-axis:</strong> Δ mRNA = (mRNA Sample 1 - mRNA Sample 2)</li>
+            <li><strong>Each point</strong> represents a gene's change pattern between the two conditions</li>
+        </ul>
+        
+        <h4 style="color: #495057; margin-bottom: 10px;">📈 Interpretation:</h4>
+        <ul>
+            <li><strong>Quadrant I (top-right):</strong> Both Ribo and mRNA increased</li>
+            <li><strong>Quadrant II (top-left):</strong> Ribo decreased, mRNA increased</li>
+            <li><strong>Quadrant III (bottom-left):</strong> Both Ribo and mRNA decreased</li>
+            <li><strong>Quadrant IV (bottom-right):</strong> Ribo increased, mRNA decreased</li>
+            <li><strong>Points near axes:</strong> Changes primarily in one data type</li>
+        </ul>
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <!-- Ribosome Profiling Files -->
+            <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px;">
+                <h4 style="color: #1976d2; margin-top: 0;">🧬 Ribosome Profiling Files</h4>
+                
+                <label for="ribo_file1" style="display: block; margin-bottom: 5px; font-weight: bold;">Ribo Sample 1:</label>
+                <select name="ribo_file1" id="ribo_file1" style="width: 100%; padding: 8px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px;">
+                    <option value="">-- Select first ribo file --</option>
+                    {% for file in ribo_files %}
+                        <option value="{{ file }}" {% if file == ribo_file1 %}selected{% endif %}>{{ file }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="ribo_file2" style="display: block; margin-bottom: 5px; font-weight: bold;">Ribo Sample 2:</label>
+                <select name="ribo_file2" id="ribo_file2" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                    <option value="">-- Select second ribo file --</option>
+                    {% for file in ribo_files %}
+                        <option value="{{ file }}" {% if file == ribo_file2 %}selected{% endif %}>{{ file }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- mRNA Files -->
+            <div style="background-color: #f3e5f5; padding: 15px; border-radius: 8px;">
+                <h4 style="color: #7b1fa2; margin-top: 0;">🧬 mRNA-seq Files</h4>
+                
+                <label for="mrna_file1" style="display: block; margin-bottom: 5px; font-weight: bold;">mRNA Sample 1:</label>
+                <select name="mrna_file1" id="mrna_file1" style="width: 100%; padding: 8px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px;">
+                    <option value="">-- Select first mRNA file --</option>
+                    {% for file in mrna_files %}
+                        <option value="{{ file }}" {% if file == mrna_file1 %}selected{% endif %}>{{ file }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="mrna_file2" style="display: block; margin-bottom: 5px; font-weight: bold;">mRNA Sample 2:</label>
+                <select name="mrna_file2" id="mrna_file2" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                    <option value="">-- Select second mRNA file --</option>
+                    {% for file in mrna_files %}
+                        <option value="{{ file }}" {% if file == mrna_file2 %}selected{% endif %}>{{ file }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 20px;">
+            <button type="submit" style="background-color: #007bff; color: white; padding: 12px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">
+                🔍 Generate Delta Analysis
+            </button>
+        </div>
+    </form>
+
+    {% if plot_div %}
+        <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #28a745;">
+            <h4 style="color: #155724; margin-top: 0;">📊 Delta Analysis Results</h4>
+            <p style="color: #155724; margin-bottom: 15px;">
+                The plot below shows the relationship between changes in ribosome profiling and mRNA expression. 
+                Each point represents a gene, positioned according to its change in both data types.
+            </p>
+            <div style="margin-bottom: 15px;">
+                <a href="{% url 'download_csv' 'delta_analysis' %}?ribo_file1={{ ribo_file1 }}&ribo_file2={{ ribo_file2 }}&mrna_file1={{ mrna_file1 }}&mrna_file2={{ mrna_file2 }}"
+                   style="background-color: #28a745; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                    📊 Download Delta Analysis Data as CSV
+                </a>
+            </div>
+        </div>
+        
+        <div id="plot-container">
+            {{ plot_div|safe }}
+        </div>
+
+
+
+        <!-- Gene Selection Section -->
+        <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+            <h4 style="color: #856404; margin-top: 0;">🎯 Gene Selection</h4>
+            <p style="color: #856404; margin-bottom: 15px;">
+                Click on points in the plot to select genes manually, or use the threshold selection above for automatic selection based on delta values.
+            </p>
+
+            <form method="POST" action="{% url 'save_selected_genes' %}">
+                {% csrf_token %}
+                <textarea id="clicked-genes" name="gene_names" rows="5" cols="50" placeholder="Selected genes will appear here..." style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 10px;"></textarea>
+                <br>
+                <button type="submit" style="background-color: #ffc107; color: #212529; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer;">
+                    💾 Save Selected Genes
+                </button>
+                <button type="button" onclick="clearGenes()" style="background-color: #6c757d; color: white; padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
+                    🗑️ Clear Selection
+                </button>
+            </form>
+
+            <div id="gene-list" style="margin-top: 15px;"></div>
+        </div>
+    {% endif %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    let selectedGenes = [];
+    let plotData = null;
+    let plotElement = null;
+
+    function attachClickListener() {
+        plotElement = document.querySelector(".js-plotly-plot");
+
+        if (plotElement) {
+
+
+            plotElement.on("plotly_click", function (data) {
+                if (data && data.points.length > 0) {
+                    const geneName = data.points[0].hovertext;
+
+                    if (geneName && !selectedGenes.includes(geneName)) {
+                        selectedGenes.push(geneName);
+                        document.getElementById("clicked-genes").value = selectedGenes.join("\n");
+                        updateGeneList();
+                        console.log("✅ Clicked gene:", geneName);
+                    }
+                }
+            });
+        } else {
+            setTimeout(attachClickListener, 1000);
+        }
+    }
+
+
+
+
+
+
+
+
+
+    function updateGeneList() {
+        const geneListDiv = document.getElementById("gene-list");
+        if (selectedGenes.length > 0) {
+            geneListDiv.innerHTML = `<strong>Selected Genes (${selectedGenes.length}):</strong><br>` +
+                                  selectedGenes.map(gene => `<span style="background-color: #e9ecef; padding: 2px 6px; margin: 2px; border-radius: 3px; display: inline-block;">${gene}</span>`).join(" ");
+        } else {
+            geneListDiv.innerHTML = "";
+        }
+    }
+
+    window.clearGenes = function() {
+        selectedGenes = [];
+        document.getElementById("clicked-genes").value = "";
+        updateGeneList();
+    };
+
+    attachClickListener();
+});
+</script>
+
+{% endblock %}

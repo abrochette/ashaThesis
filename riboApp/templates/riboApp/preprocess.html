@@ -5,6 +5,23 @@
 {% block content %}
   <h1>Pre-Processing</h1>
 
+  <div class="alert alert-info" role="alert">
+    <h5>📋 Separate File Processing</h5>
+    <p>Upload separate files for different data types:</p>
+    <ul>
+      <li><strong>Ribosome Profiling:</strong> Always required - optimized for short reads (~28-32nt)</li>
+      <li><strong>mRNA-seq:</strong> Optional - optimized for longer reads (~150nt)</li>
+    </ul>
+    <p><strong>File format (one sample per line):</strong></p>
+    <pre><strong>Ribosome profiling file:</strong>
+sample1_ribo /path/to/ribo1.fastq.gz
+sample2_ribo /path/to/ribo2.fastq.gz
+
+<strong>mRNA-seq file (if included):</strong>
+sample1_mRNA /path/to/mrna1.fastq.gz
+sample2_mRNA /path/to/mrna2.fastq.gz</pre>
+  </div>
+
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {% load crispy_forms_tags %}
@@ -13,10 +30,28 @@
   </form>
 
   {% if script_file %}
-    <div>
-      <p>Click here to Download:</p>
+    <div class="alert alert-success" role="alert">
+      <h5>✅ Script Generated Successfully!</h5>
+
+      {% if processing_summary %}
+        <h6>Processing Parameters:</h6>
+        <ul>
+          <li><strong>Ribosome Profiling Samples:</strong> {{ processing_summary.ribo_samples }}</li>
+          <li><strong>mRNA-seq Samples:</strong> {{ processing_summary.mrna_samples }}</li>
+          <li><strong>Include mRNA-seq Processing:</strong> {{ processing_summary.include_rnaseq|yesno:"Yes,No" }}</li>
+          <li><strong>Ribosome Profiling Read Length:</strong> {{ processing_summary.ribo_read_length_range }}</li>
+          <li><strong>Genome:</strong> {{ processing_summary.genome }}</li>
+          <li><strong>Barcode Demultiplexing:</strong> {{ processing_summary.barcode_enabled|yesno:"Enabled,Disabled" }}</li>
+          <li><strong>Ribosome Profiling Adapter Trimming:</strong> <code>{{ processing_summary.ribo_clip_arguments }}</code></li>
+          {% if processing_summary.include_rnaseq %}
+          <li><strong>mRNA-seq Adapter Trimming:</strong> <code>{{ processing_summary.mrna_clip_arguments }}</code></li>
+          {% endif %}
+        </ul>
+      {% endif %}
+
+      <p><strong>Download your customized processing script:</strong></p>
       <a href="/media/{{ script_file }}" download>
-        <button type="button" class="btn btn-success">Download Script</button>
+        <button type="button" class="btn btn-success">📥 Download Script</button>
       </a>
     </div>
   {% endif %}

@@ -5,7 +5,12 @@ from riboApp.models import UploadedParquet, UploadedMrnaParquet
 
 class CreateNewList(forms.Form):
     experimentName = forms.CharField(label="Experiment name", max_length=200, required=False)
-    adapter = forms.CharField(label="Input adapter sequence to be trimmed", max_length=500, required=True)
+    adapter = forms.CharField(
+        label="Input adapter sequence to be trimmed",
+        max_length=500,
+        required=True,
+        help_text="Adapter sequence found in your sequencing data (e.g., AGATCGGAAGAGC)"
+    )
     mouseGenome = forms.BooleanField(label="GRCm39", required=False)
     humanGenome = forms.BooleanField(label="GRCh38", required=False)
     useBarcode = forms.BooleanField(
@@ -13,7 +18,22 @@ class CreateNewList(forms.Form):
         required=False,
         help_text="Check this if your samples contain barcodes that need to be removed during preprocessing"
     )
-    sampleFile = forms.FileField(label="Upload text file containing sample data paths", required=True)
+    includeRnaSeq = forms.BooleanField(
+        label="Include mRNA-seq data processing",
+        required=False,
+        initial=True,
+        help_text="Check this if you have mRNA-seq data to process alongside ribosome profiling data"
+    )
+    sampleFile = forms.FileField(
+        label="Upload text file containing ribosome profiling sample data paths",
+        required=True,
+        help_text="Text file with ribosome profiling sample names and file paths (one per line: sample_name /path/to/file.fastq.gz)"
+    )
+    mrnaSeqFile = forms.FileField(
+        label="Upload text file containing mRNA-seq sample data paths",
+        required=False,
+        help_text="Text file with mRNA-seq sample names and file paths. Only required if 'Include mRNA-seq data processing' is checked."
+    )
 
 
 class ParquetUploadForm(forms.ModelForm):

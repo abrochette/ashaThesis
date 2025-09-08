@@ -23,7 +23,6 @@ transcriptome="{transcriptome}"
 regions="{regions}"
 transcriptLengths="{transcriptLengths}"
 experimentName="{experimentName}"
-filePaths="{filePaths}"
 
 
 git clone https://github.com/ribosomeprofiling/riboflow.git
@@ -35,11 +34,8 @@ git clone https://github.com/ribosomeprofiling/riboflow.git
 cd riboflow
 
 
-# Create output directory if not exists
-mkdir -p "$LOG_DIR"
-
 # Write variables to a YAML file
-cat <<EOL > "${OUTPUT_DIR}/project.yaml"
+cat <<EOL > "project.yaml"
 # N E X T F L O W
 ##########################################################################
 #####   SAMPLE RIBOFLOW ARGUMENTS FILE WITH RNASEQ AND METADATA   ########
@@ -63,17 +59,22 @@ deduplicate: true
 # AND PROVIDE RNA-Seq data
 # under the key rnaseq in this file. See below.
 # If you don't have RNA-Seq data, set this flag to false
-do_rnaseq: true
+do_rnaseq: {includeRnaSeq}
 
 # If you don't have metadata set do_metadata to false.
 # If you have metadata, provide yaml files for the experiments
 # under input -> metadata below.
 do_metadata: true
 
-{barcodeComment}
-# These arguments are used for clipping adapters by cutadapt.
+{riboBarcodeComment}
+# These arguments are used for clipping adapters by cutadapt for ribosome profiling data.
 # (see https://cutadapt.readthedocs.io/en/stable/guide.html )
-clip_arguments: '{clipArguments}'
+clip_arguments: '{riboClipArguments}'
+
+{mrnaBarcodeComment}
+# These arguments are used for clipping adapters by cutadapt for mRNA-seq data.
+# Different parameters optimized for longer mRNA reads (~150nt)
+clip_arguments_rnaseq: '{mrnaClipArguments}'
 
 # If you don't want to perform and adapter clipping,
 # you can comment the above option and use the option below.
@@ -101,14 +102,16 @@ alignment_arguments:
 
 ###############################################################################
 # RiboPy parameters for ribo file generation.
+# Note: These parameters are optimized for ribosome profiling data
+# For mRNA-seq data, read length filtering is handled during preprocessing
 ribo:
     ref_name:        "appris-v2"
     metagene_radius: 50
     left_span:       35
     right_span:      10
     read_length:
-       min: 28
-       max: 32
+       min: {readLengthMin}
+       max: {readLengthMax}
     coverage: true
 
 ###############################################################################
@@ -185,7 +188,12 @@ input:
    # You can leave it as empty "" if you provide complete paths.
    fastq_base: ""
    fastq:
-       "${filePaths}"
+{riboFilePaths}
+
+   # mRNA-seq data (only included if do_rnaseq is true)
+   rnaseq_base: ""
+   rnaseq:
+{mrnaFilePaths}
 EOL
 
 
