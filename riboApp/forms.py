@@ -14,9 +14,9 @@ class CreateNewList(forms.Form):
     mouseGenome = forms.BooleanField(label="GRCm39", required=False)
     humanGenome = forms.BooleanField(label="GRCh38", required=False)
     useBarcode = forms.BooleanField(
-        label="Use barcode for demultiplexing",
+        label="Use UMI for demultiplexing",
         required=False,
-        help_text="Check this if your samples contain barcodes that need to be removed during preprocessing"
+        help_text="Check this if your samples contain UMIs (Unique Molecular Identifiers) that need to be removed during preprocessing"
     )
     includeRnaSeq = forms.BooleanField(
         label="Include mRNA-seq data processing",

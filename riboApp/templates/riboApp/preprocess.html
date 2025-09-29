@@ -5,21 +5,97 @@
 {% block content %}
   <h1>Pre-Processing</h1>
 
-  <div class="alert alert-info" role="alert">
-    <h5>📋 Separate File Processing</h5>
-    <p>Upload separate files for different data types:</p>
-    <ul>
-      <li><strong>Ribosome Profiling:</strong> Always required - optimized for short reads (~28-32nt)</li>
-      <li><strong>mRNA-seq:</strong> Optional - optimized for longer reads (~150nt)</li>
-    </ul>
-    <p><strong>File format (one sample per line):</strong></p>
-    <pre><strong>Ribosome profiling file:</strong>
-sample1_ribo /path/to/ribo1.fastq.gz
-sample2_ribo /path/to/ribo2.fastq.gz
+  <div class="overview-section">
+    <h2>What is Preprocessing?</h2>
+    <p>Preprocessing converts raw ribosome profiling FASTQ files into analysis-ready parquet format through a standardized pipeline:</p>
 
-<strong>mRNA-seq file (if included):</strong>
-sample1_mRNA /path/to/mrna1.fastq.gz
-sample2_mRNA /path/to/mrna2.fastq.gz</pre>
+    <div class="process-steps">
+      <div class="process-step">
+        <div class="step-text">
+          <strong>Quality Control:</strong> Remove low-quality reads and adapter sequences
+        </div>
+      </div>
+      <div class="process-step">
+        <div class="step-text">
+          <strong>Length Filtering:</strong> Select ribosome footprint reads (typically 28-32 nucleotides)
+        </div>
+      </div>
+      <div class="process-step">
+        <div class="step-text">
+          <strong>Genome Alignment:</strong> Map reads to reference genome and annotate genomic regions
+        </div>
+      </div>
+      <div class="process-step">
+        <div class="step-text">
+          <strong>Data Export:</strong> Generate parquet files optimized for fast analysis
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="how-to-run-section">
+    <h2>How to Run Everything</h2>
+    <div class="run-steps">
+      <div class="run-step">
+        <div class="run-number">1</div>
+        <div class="run-content">
+          <h4>Prepare Sample Lists</h4>
+          <p>Create text files listing your samples and FASTQ file paths (see format below)</p>
+        </div>
+      </div>
+      <div class="run-step">
+        <div class="run-number">2</div>
+        <div class="run-content">
+          <h4>Generate Scripts</h4>
+          <p>Use this form to generate riboflow processing scripts with your parameters</p>
+        </div>
+      </div>
+      <div class="run-step">
+        <div class="run-number">3</div>
+        <div class="run-content">
+          <h4>Run Processing</h4>
+          <p>Execute the generated bash script on your compute cluster or local machine</p>
+        </div>
+      </div>
+      <div class="run-step">
+        <div class="run-number">4</div>
+        <div class="run-content">
+          <h4>Upload Results</h4>
+          <p>Upload the resulting parquet files to RiboApp for analysis</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-info" role="alert">
+    <h5>Input File Format</h5>
+    <p>Provide sample lists in text files with one sample per line:</p>
+
+    <div class="format-examples">
+      <div class="format-example">
+        <h6><strong>Ribosome Profiling Samples (Required):</strong></h6>
+        <pre>sample1_ribo /path/to/ribo1.fastq.gz
+sample2_ribo /path/to/ribo2.fastq.gz
+sample3_ribo /path/to/ribo3.fastq.gz</pre>
+      </div>
+
+      <div class="format-example">
+        <h6><strong>mRNA-seq Samples (Optional):</strong></h6>
+        <pre>sample1_mRNA /path/to/mrna1.fastq.gz
+sample2_mRNA /path/to/mrna2.fastq.gz
+sample3_mRNA /path/to/mrna3.fastq.gz</pre>
+      </div>
+    </div>
+
+    <div class="format-tips">
+      <h6><strong>Tips:</strong></h6>
+      <ul>
+        <li>Use descriptive sample names (e.g., "P42_Kidney_Ribo_rep1")</li>
+        <li>Ensure file paths are accessible from your compute environment</li>
+        <li>Both space-separated and CSV formats are supported</li>
+        <li>mRNA-seq data is optional but recommended for comparative analysis</li>
+      </ul>
+    </div>
   </div>
 
   <form method="post" enctype="multipart/form-data">
@@ -28,6 +104,148 @@ sample2_mRNA /path/to/mrna2.fastq.gz</pre>
     {{ form|crispy }}
     <button type="submit" class="btn btn-primary">Submit</button>
   </form>
+
+  <style>
+    .overview-section {
+      background: #f8f9fa;
+      padding: 30px;
+      border-radius: 10px;
+      margin-bottom: 30px;
+    }
+
+    .overview-section h2 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .process-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-top: 25px;
+    }
+
+    .process-step {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .step-text {
+      line-height: 1.4;
+    }
+
+    .how-to-run-section {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .how-to-run-section h2 {
+      color: #333;
+      margin-bottom: 25px;
+    }
+
+    .run-steps {
+      display: grid;
+      gap: 20px;
+    }
+
+    .run-step {
+      display: flex;
+      align-items: center;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+    }
+
+    .run-number {
+      background: #667eea;
+      color: white;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      margin-right: 20px;
+      flex-shrink: 0;
+    }
+
+    .run-content h4 {
+      margin-bottom: 8px;
+      color: #333;
+    }
+
+    .run-content p {
+      margin: 0;
+      color: #666;
+    }
+
+    .format-examples {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin: 20px 0;
+    }
+
+    .format-example {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 5px;
+      border-left: 3px solid #17a2b8;
+    }
+
+    .format-example h6 {
+      margin-bottom: 10px;
+      color: #333;
+    }
+
+    .format-example pre {
+      background: white;
+      padding: 10px;
+      border-radius: 3px;
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    .format-tips {
+      background: #e7f3ff;
+      padding: 15px;
+      border-radius: 5px;
+      margin-top: 20px;
+    }
+
+    .format-tips h6 {
+      margin-bottom: 10px;
+      color: #333;
+    }
+
+    .format-tips ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .format-tips li {
+      margin-bottom: 5px;
+      color: #666;
+    }
+
+    @media (max-width: 768px) {
+      .process-steps {
+        grid-template-columns: 1fr;
+      }
+
+      .format-examples {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 
   {% if script_file %}
     <div class="alert alert-success" role="alert">
@@ -41,7 +259,7 @@ sample2_mRNA /path/to/mrna2.fastq.gz</pre>
           <li><strong>Include mRNA-seq Processing:</strong> {{ processing_summary.include_rnaseq|yesno:"Yes,No" }}</li>
           <li><strong>Ribosome Profiling Read Length:</strong> {{ processing_summary.ribo_read_length_range }}</li>
           <li><strong>Genome:</strong> {{ processing_summary.genome }}</li>
-          <li><strong>Barcode Demultiplexing:</strong> {{ processing_summary.barcode_enabled|yesno:"Enabled,Disabled" }}</li>
+          <li><strong>UMI Demultiplexing:</strong> {{ processing_summary.barcode_enabled|yesno:"Enabled,Disabled" }}</li>
           <li><strong>Ribosome Profiling Adapter Trimming:</strong> <code>{{ processing_summary.ribo_clip_arguments }}</code></li>
           {% if processing_summary.include_rnaseq %}
           <li><strong>mRNA-seq Adapter Trimming:</strong> <code>{{ processing_summary.mrna_clip_arguments }}</code></li>
@@ -64,7 +282,7 @@ sample2_mRNA /path/to/mrna2.fastq.gz</pre>
         <p><strong>Adapter sequence: </strong> {{ input.adapter }}</p>
         <p><strong>GRCm39: </strong> {{ input.mouseGenome|yesno:"Yes,No" }}</p>
         <p><strong>GRCh38: </strong> {{ input.humanGenome|yesno:"Yes,No" }}</p>
-        <p><strong>Use Barcode: </strong> {{ input.useBarcode|yesno:"Yes,No" }}</p>
+        <p><strong>Use UMI: </strong> {{ input.useBarcode|yesno:"Yes,No" }}</p>
         <p><strong>File containing sample data paths: </strong>
         <a href="{% url 'download_file' input.sampleFile.name|slice:"8:" %}">{{ input.sampleFile.name|slice:"8:" }}</a>
         </p>

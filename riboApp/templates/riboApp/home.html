@@ -1,53 +1,320 @@
 {% extends 'riboApp/base.html' %}
 
 {% block content %}
-<h1>RiboApp Home</h1>
+<div class="hero-section">
+    <div class="hero-content">
+        <h1 class="hero-title">RiboApp</h1>
+        <p class="hero-subtitle">Comprehensive Ribosome Profiling Analysis Platform</p>
+        <p class="hero-description">
+            A powerful web application for processing, analyzing, and visualizing ribosome profiling (Ribo-seq) data.
+            From raw FASTQ files to publication-ready plots, RiboApp streamlines your ribosome profiling workflow.
+        </p>
+    </div>
+</div>
 
-<div class="vertical-menu">
-    <a href="/preprocess/" class="menu-item">Pre-Process <br> <span class="arrow">↓ </span><br></a>
-    <a href="/analyze/" class="menu-item">Analyze <br> <span class="arrow">↓ </span><br></a>
-    <a href="/pSiteLocation/" class="menu-item">Locate P Sites </span></a>
+<div class="features-section">
+    <h2 class="section-title">Key Features</h2>
+    <div class="features-grid">
+        <div class="feature-card">
+            <h3>Gene Expression Analysis</h3>
+            <p>Compare ribosome profiling data across samples with correlation plots, region-specific analysis, and CDS filtering</p>
+        </div>
+        <div class="feature-card">
+            <h3>P-site Analysis</h3>
+            <p>Determine P-site offsets with stop codon periodicity analysis and metagene profiling for accurate ribosome positioning</p>
+        </div>
+        <div class="feature-card">
+            <h3>Multi-dimensional Visualization</h3>
+            <p>PCA analysis, read length distributions, and interactive plots with region-specific color coding</p>
+        </div>
+        <div class="feature-card">
+            <h3>High Performance</h3>
+            <p>Optimized caching system for fast analysis of large datasets with automatic preprocessing</p>
+        </div>
+    </div>
+</div>
+
+<div class="workflow-section">
+    <h2 class="section-title">Analysis Workflow</h2>
+    <div class="workflow-steps">
+        <div class="workflow-step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+                <h3>Pre-Process</h3>
+                <p>Generate riboflow scripts for processing raw FASTQ files into analysis-ready parquet format</p>
+                <a href="/preprocess/" class="step-button">Start Processing →</a>
+            </div>
+        </div>
+
+        <div class="workflow-arrow">↓</div>
+
+        <div class="workflow-step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+                <h3>Upload & Analyze</h3>
+                <p>Upload your processed parquet files and start analyzing your data</p>
+                <a href="/upload/" class="step-button">Start Analysis →</a>
+            </div>
+        </div>
+
+        <div class="workflow-arrow">↓</div>
+
+        <div class="workflow-step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+                <h3>Quality Control</h3>
+                <p>Determine P-site offsets and validate data quality with periodicity analysis</p>
+                <a href="/psiteOffset/" class="step-button">Check P-sites →</a>
+            </div>
+        </div>
+
+        <div class="workflow-arrow">↓</div>
+
+        <div class="workflow-step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+                <h3>Advanced Analysis</h3>
+                <p>Explore your data with comprehensive analysis tools and interactive visualizations</p>
+                <a href="/upload/" class="step-button">Continue Analysis →</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="quick-links-section">
+    <h2 class="section-title">Quick Access</h2>
+    <div class="quick-links-grid">
+        <a href="/geneCounts/" class="quick-link">
+            <div class="quick-link-text">Gene Counts</div>
+        </a>
+        <a href="/psiteOffset/" class="quick-link">
+            <div class="quick-link-text">P-site Analysis</div>
+        </a>
+        <a href="/pca_plot/" class="quick-link">
+            <div class="quick-link-text">PCA Analysis</div>
+        </a>
+        <a href="/readLengthDistribution/" class="quick-link">
+            <div class="quick-link-text">Read Lengths</div>
+        </a>
+    </div>
 </div>
 
 {% endblock %}
 
 <style>
-    /* Style for the vertical menu */
-    .vertical-menu {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        margin-top: 20px;
-    }
-
-    .menu-item {
-        display: block;
-        padding: 15px;
-        font-size: 20px;
-        font-weight: bold;
-        text-decoration: none;
-        color: #368BC1;
-        background-color: #f9f9f9;
-        border: 2px solid #368BC1;
-        width: 200px;
+    /* Hero Section */
+    .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 60px 0;
+        margin: -20px -20px 40px -20px;
         text-align: center;
+    }
+
+    .hero-content {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 0 20px;
+    }
+
+    .hero-title {
+        font-size: 3.5rem;
+        font-weight: bold;
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .hero-subtitle {
+        font-size: 1.5rem;
+        margin-bottom: 20px;
+        opacity: 0.9;
+    }
+
+    .hero-description {
+        font-size: 1.1rem;
+        line-height: 1.6;
+        opacity: 0.8;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    /* Section Titles */
+    .section-title {
+        text-align: center;
+        color: #333;
+        margin-bottom: 40px;
+        font-size: 2rem;
+        font-weight: bold;
+    }
+
+    /* Features Section */
+    .features-section {
+        margin-bottom: 60px;
+    }
+
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 30px;
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .feature-card {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        text-align: center;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .feature-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+    }
+
+    .feature-card h3 {
+        color: #333;
+        margin-bottom: 15px;
+        font-size: 1.3rem;
+    }
+
+    .feature-card p {
+        color: #666;
+        line-height: 1.5;
+    }
+
+    /* Workflow Section */
+    .workflow-section {
+        background-color: #f8f9fa;
+        padding: 60px 20px;
+        margin: 0 -20px 60px -20px;
+    }
+
+    .workflow-steps {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .workflow-step {
+        display: flex;
+        align-items: center;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+
+    .step-number {
+        background: #667eea;
+        color: white;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin-right: 30px;
+        flex-shrink: 0;
+    }
+
+    .step-content {
+        flex-grow: 1;
+    }
+
+    .step-content h3 {
+        color: #333;
         margin-bottom: 10px;
-        position: relative;
+        font-size: 1.4rem;
     }
 
-    .menu-item:hover {
-        background-color: #87AFC7;
+    .step-content p {
+        color: #666;
+        margin-bottom: 15px;
+        line-height: 1.5;
+    }
+
+    .step-button {
+        background: #667eea;
         color: white;
-        border-color: #87AFC7;
+        padding: 10px 20px;
+        border-radius: 5px;
+        text-decoration: none;
+        font-weight: bold;
+        transition: background-color 0.3s ease;
     }
 
-    .arrow {
-        font-size: 16px;
-        margin-left: 10px;
-        color: #368BC1;
-    }
-
-    .menu-item:hover .arrow {
+    .step-button:hover {
+        background: #5a6fd8;
         color: white;
+        text-decoration: none;
+    }
+
+    .workflow-arrow {
+        text-align: center;
+        font-size: 2rem;
+        color: #667eea;
+        margin: 10px 0;
+    }
+
+    /* Quick Links Section */
+    .quick-links-section {
+        margin-bottom: 60px;
+    }
+
+    .quick-links-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .quick-link {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-align: center;
+        text-decoration: none;
+        color: #333;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .quick-link:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        text-decoration: none;
+        color: #667eea;
+    }
+
+    .quick-link-text {
+        font-weight: bold;
+        font-size: 1.1rem;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .hero-title {
+            font-size: 2.5rem;
+        }
+
+        .hero-subtitle {
+            font-size: 1.2rem;
+        }
+
+        .workflow-step {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .step-number {
+            margin-right: 0;
+            margin-bottom: 20px;
+        }
     }
 </style>

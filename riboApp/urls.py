@@ -16,6 +16,7 @@ urlpatterns = [
     path("upload/", views.upload_parquet, name="upload_parquet"),
     path("clear_parquet_files/", views.clear_parquet_files, name="clear_parquet_files"),
     path("geneCounts/", views.geneCounts, name="geneCounts"),
+    path("log2GeneCounts/", views.log2_geneCounts, name="log2GeneCounts"),
     path("plot_gene_counts/", views.plot_gene_counts, name="plot_gene_counts"),
     path("save_selected_genes/", views.save_selected_genes, name="save_selected_genes"),
     path("binCounts/", views.bin_counts_view, name="binCounts"),

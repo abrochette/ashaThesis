@@ -348,6 +348,8 @@ def upload_parquet(request):
                         failed_uploads.append(f"{file.name}: not a .parquet file")
 
                 if successful_uploads > 0:
+                    # Clear global caches since new files were uploaded
+                    clear_global_caches()
                     messages.success(request, f"Successfully uploaded {successful_uploads} riboseq files")
                 if failed_uploads:
                     messages.error(request, f"Failed uploads: {'; '.join(failed_uploads)}")
@@ -390,6 +392,8 @@ def upload_parquet(request):
                         failed_uploads.append(f"{file.name}: not a .parquet file")
 
                 if successful_uploads > 0:
+                    # Clear global caches since new files were uploaded
+                    clear_global_caches()
                     messages.success(request, f"Successfully uploaded {successful_uploads} mRNA files")
                 if failed_uploads:
                     messages.error(request, f"Failed uploads: {'; '.join(failed_uploads)}")
@@ -441,6 +445,7 @@ def clear_parquet_files(request):
 
             # Clear cache
             cache.clear()
+            clear_global_caches()
             print("Cache cleared")
 
             messages.success(request, f"All parquet files and related data have been cleared successfully! Cleared directories: {', '.join(cleared_dirs)}")
@@ -574,7 +579,28 @@ def get_gene_counts_with_regions(file1, file2, cds_only=False):
     return df
 
 
-def get_gene_counts(file1, file2, cds_only=False):
+def get_total_read_count(filename, file_type="riboseq"):
+    """Get total read count from a parquet file for normalization"""
+    if file_type == "riboseq":
+        file_path = os.path.join(PARQUET_FOLDER, filename)
+    else:  # mrna
+        file_path = os.path.join(MRNA_FOLDER, filename)
+
+    if not os.path.exists(file_path):
+        print(f"❌ File not found: {file_path}")
+        return 0
+
+    try:
+        # Read only the read_count column for efficiency
+        df = pq.read_table(file_path, columns=["read_count"]).to_pandas()
+        total_reads = df["read_count"].sum()
+        print(f"📊 Total reads in {filename}: {total_reads:,}")
+        return total_reads
+    except Exception as e:
+        print(f"❌ Error reading {filename}: {str(e)}")
+        return 0
+
+def get_gene_counts(file1, file2, cds_only=False, normalize_by_total=False):
     """Get gene counts for two files - OPTIMIZED with preprocessing cache
 
     Args:
@@ -584,7 +610,7 @@ def get_gene_counts(file1, file2, cds_only=False):
     """
 
     if not cds_only:
-        # For total counts, use the ORIGINAL fast system to maintain speed
+        # For total counts, use the fastest available method
         # 🚀 Try to use the new preprocessing cache first (much faster)
         df1_counts = get_cached_gene_counts(file1, "riboseq")
         df2_counts = get_cached_gene_counts(file2, "riboseq")
@@ -595,12 +621,29 @@ def get_gene_counts(file1, file2, cds_only=False):
             gene_counts_2 = dict(zip(df2_counts['gene_name'], df2_counts['total_count']))
             print(f"🚀 Using cached gene counts for {file1} and {file2}")
         else:
-            # Fallback to existing pickle cache system (this should be fast)
-            print(f"⚠️ Cache miss, using pickle cache for {file1} and {file2}")
-            gene_counts_1 = load_or_build_gene_counts_dict(file1)
-            gene_counts_2 = load_or_build_gene_counts_dict(file2)
+            # Try region-based cache (might be faster than rebuilding pickle)
+            print(f"⚠️ Preprocessing cache miss, trying region cache for {file1} and {file2}")
+            try:
+                ribo_counts1 = get_region_gene_counts(file1, "riboseq")
+                ribo_counts2 = get_region_gene_counts(file2, "riboseq")
+
+                # Sum all regions for total counts
+                gene_counts_1 = {}
+                gene_counts_2 = {}
+
+                for gene, regions in ribo_counts1.items():
+                    gene_counts_1[gene] = sum(regions.values())
+
+                for gene, regions in ribo_counts2.items():
+                    gene_counts_2[gene] = sum(regions.values())
+
+                print(f"✅ Using region-based total counts for {file1} and {file2}")
+            except Exception as e:
+                print(f"⚠️ Region cache also failed, using pickle cache for {file1} and {file2}")
+                gene_counts_1 = load_or_build_gene_counts_dict(file1)
+                gene_counts_2 = load_or_build_gene_counts_dict(file2)
     else:
-        # For CDS-only, try the new cache first, then fallback to region-specific method
+        # For CDS-only, try the new cache first, then use region cache (fast!)
         df1_counts = get_cached_gene_counts(file1, "riboseq", cds_only=True)
         df2_counts = get_cached_gene_counts(file2, "riboseq", cds_only=True)
 
@@ -610,8 +653,8 @@ def get_gene_counts(file1, file2, cds_only=False):
             gene_counts_2 = dict(zip(df2_counts['gene_name'], df2_counts['total_count']))
             print(f"🚀 Using cached CDS-only gene counts for {file1} and {file2}")
         else:
-            print(f"⚠️ No CDS cache available, falling back to region-specific counts for {file1} and {file2}")
-            # Fallback to slower region-specific method for CDS-only
+            print(f"⚠️ No CDS preprocessing cache, using region cache for {file1} and {file2}")
+            # Use region cache (this should be fast now!)
             ribo_counts1 = get_region_gene_counts(file1, "riboseq")
             ribo_counts2 = get_region_gene_counts(file2, "riboseq")
 
@@ -627,6 +670,8 @@ def get_gene_counts(file1, file2, cds_only=False):
                 if "CDS" in regions:
                     gene_counts_2[gene] = regions["CDS"]
 
+            print(f"✅ Using region-based CDS counts for {file1} and {file2}")
+
     common_genes = set(gene_counts_1.keys()) & set(gene_counts_2.keys())
 
     df_merged = pd.DataFrame({
@@ -635,8 +680,22 @@ def get_gene_counts(file1, file2, cds_only=False):
         "read_count_y": [gene_counts_2[g] for g in common_genes],
     })
 
+    # Apply normalization if requested
+    if normalize_by_total:
+        total_reads_1 = get_total_read_count(file1, "riboseq")
+        total_reads_2 = get_total_read_count(file2, "riboseq")
+
+        if total_reads_1 > 0 and total_reads_2 > 0:
+            # Normalize to RPM (Reads Per Million)
+            df_merged["read_count_x"] = (df_merged["read_count_x"] / total_reads_1) * 1e6
+            df_merged["read_count_y"] = (df_merged["read_count_y"] / total_reads_2) * 1e6
+            print(f"📊 Applied RPM normalization: {file1} ({total_reads_1:,} total reads), {file2} ({total_reads_2:,} total reads)")
+        else:
+            print(f"⚠️ Could not normalize - zero total reads found")
+
     region_text = "CDS-only" if cds_only else "total"
-    print(f"Processed {len(common_genes)} common genes for {file1} and {file2} ({region_text})")
+    norm_text = " (RPM normalized)" if normalize_by_total else ""
+    print(f"Processed {len(common_genes)} common genes for {file1} and {file2} ({region_text}{norm_text})")
     return df_merged
 
 def geneCounts(request):
@@ -651,11 +710,22 @@ def geneCounts(request):
         file2 = request.POST.get("file2")
         cds_only = request.POST.get("cds_only") == "true"
         show_regions = request.POST.get("show_regions") == "true"
+        normalize_by_total = request.POST.get("normalize_by_total") == "true"
 
         if file1 and file2:
             if show_regions:
                 # Use region-aware function for colored plotting
                 df = get_gene_counts_with_regions(file1, file2, cds_only=cds_only)
+
+                # Apply normalization if requested
+                if normalize_by_total:
+                    total_reads_1 = get_total_read_count(file1, "riboseq")
+                    total_reads_2 = get_total_read_count(file2, "riboseq")
+
+                    if total_reads_1 > 0 and total_reads_2 > 0:
+                        # Normalize to RPM (Reads Per Million)
+                        df["read_count_x"] = (df["read_count_x"] / total_reads_1) * 1e6
+                        df["read_count_y"] = (df["read_count_y"] / total_reads_2) * 1e6
 
                 # Calculate correlation coefficient
                 correlation = df["read_count_x"].corr(df["read_count_y"])
@@ -670,6 +740,10 @@ def geneCounts(request):
                 }
 
                 region_text = " (CDS only)" if cds_only else " by Region"
+                norm_text = " (RPM Normalized)" if normalize_by_total else ""
+
+                x_label = f"{file1} (RPM)" if normalize_by_total else file1
+                y_label = f"{file2} (RPM)" if normalize_by_total else file2
 
                 fig = px.scatter(
                     df,
@@ -678,10 +752,10 @@ def geneCounts(request):
                     color="region",
                     hover_name="gene_name",
                     hover_data=["region"],
-                    title=f"Gene Read Counts{region_text}: {file1} vs {file2}<br><sub>Overall R = {correlation:.3f}, R² = {r_squared:.3f}</sub>",
+                    title=f"Gene Read Counts{region_text}{norm_text}: {file1} vs {file2}<br><sub>Overall R = {correlation:.3f}, R² = {r_squared:.3f}</sub>",
                     labels={
-                        "read_count_x": file1,
-                        "read_count_y": file2,
+                        "read_count_x": x_label,
+                        "read_count_y": y_label,
                         "region": "Genomic Region"
                     },
                     color_discrete_map=region_colors
@@ -698,26 +772,150 @@ def geneCounts(request):
                         )
             else:
                 # Use traditional aggregated function for single-color plotting
-                df = get_gene_counts(file1, file2, cds_only=cds_only)
+                df = get_gene_counts(file1, file2, cds_only=cds_only, normalize_by_total=normalize_by_total)
 
                 # Calculate correlation coefficient
                 correlation = df["read_count_x"].corr(df["read_count_y"])
                 r_squared = correlation ** 2
 
                 region_text = " (CDS only)" if cds_only else ""
+                norm_text = " (RPM Normalized)" if normalize_by_total else ""
+
+                x_label = f"{file1} (RPM)" if normalize_by_total else file1
+                y_label = f"{file2} (RPM)" if normalize_by_total else file2
 
                 fig = px.scatter(
                     df,
                     x="read_count_x",
                     y="read_count_y",
                     hover_name="gene_name",
-                    title=f"Gene Read Counts{region_text}: {file1} vs {file2}<br><sub>R = {correlation:.3f}, R² = {r_squared:.3f}</sub>",
-                    labels={"read_count_x": file1, "read_count_y": file2},
+                    title=f"Gene Read Counts{region_text}{norm_text}: {file1} vs {file2}<br><sub>R = {correlation:.3f}, R² = {r_squared:.3f}</sub>",
+                    labels={"read_count_x": x_label, "read_count_y": y_label},
                 )
 
             plot_div = fig.to_html(full_html=False)
 
     return render(request, "riboApp/geneCounts.html", {
+        "selected_genes": selected_genes,
+        "parquet_files": parquet_files,
+        "plot_div": plot_div,
+        "file1": file1,
+        "file2": file2,
+    })
+
+
+def log2_geneCounts(request):
+    """Gene counts analysis with log2 scale on both axes"""
+    selected_genes = SelectedGene.objects.all()
+    parquet_files = get_available_parquet_files()
+    plot_div = None
+    file1 = None
+    file2 = None
+
+    if request.method == "POST":
+        file1 = request.POST.get("file1")
+        file2 = request.POST.get("file2")
+        cds_only = request.POST.get("cds_only") == "true"
+        show_regions = request.POST.get("show_regions") == "true"
+        normalize_by_total = request.POST.get("normalize_by_total") == "true"
+
+        if file1 and file2:
+            if show_regions:
+                # Use region-aware function for colored plotting
+                df = get_gene_counts_with_regions(file1, file2, cds_only=cds_only)
+
+                # Apply normalization if requested
+                if normalize_by_total:
+                    total_reads_1 = get_total_read_count(file1, "riboseq")
+                    total_reads_2 = get_total_read_count(file2, "riboseq")
+
+                    if total_reads_1 > 0 and total_reads_2 > 0:
+                        # Normalize to RPM (Reads Per Million)
+                        df["read_count_x"] = (df["read_count_x"] / total_reads_1) * 1e6
+                        df["read_count_y"] = (df["read_count_y"] / total_reads_2) * 1e6
+
+                # Filter out zero values for log2 transformation
+                df = df[(df["read_count_x"] > 0) & (df["read_count_y"] > 0)]
+
+                # Calculate correlation coefficient
+                correlation = df["read_count_x"].corr(df["read_count_y"])
+                r_squared = correlation ** 2
+
+                # Define colors for different regions
+                region_colors = {
+                    'CDS': '#1f77b4',      # Blue
+                    '5UTR': '#ff7f0e',     # Orange
+                    '3UTR': '#2ca02c',     # Green
+                    'UNKNOWN': '#9467bd',  # Purple
+                }
+
+                region_text = " (CDS only)" if cds_only else " by Region"
+                norm_text = " (RPM Normalized)" if normalize_by_total else ""
+
+                x_label = f"{file1} (RPM, Log₂)" if normalize_by_total else f"{file1} (Log₂)"
+                y_label = f"{file2} (RPM, Log₂)" if normalize_by_total else f"{file2} (Log₂)"
+
+                fig = px.scatter(
+                    df,
+                    x="read_count_x",
+                    y="read_count_y",
+                    color="region",
+                    hover_name="gene_name",
+                    hover_data=["region"],
+                    title=f"Gene Read Counts{region_text}{norm_text} (Log₂ Scale): {file1} vs {file2}<br><sub>Overall R = {correlation:.3f}, R² = {r_squared:.3f}</sub>",
+                    labels={
+                        "read_count_x": x_label,
+                        "read_count_y": y_label,
+                        "region": "Genomic Region"
+                    },
+                    color_discrete_map=region_colors,
+                    log_x=True,
+                    log_y=True
+                )
+
+                # Make 5UTR points transparent so underlying points are visible
+                for trace in fig.data:
+                    if trace.name == '5UTR':
+                        trace.update(
+                            marker=dict(
+                                opacity=0.4,  # Make 5UTR points transparent
+                                line=dict(width=1, color='#ff7f0e')  # Add border for visibility
+                            )
+                        )
+            else:
+                # Use traditional aggregated function for single-color plotting
+                df = get_gene_counts(file1, file2, cds_only=cds_only, normalize_by_total=normalize_by_total)
+
+                # Filter out zero values for log2 transformation
+                df = df[(df["read_count_x"] > 0) & (df["read_count_y"] > 0)]
+
+                # Calculate correlation coefficient
+                correlation = df["read_count_x"].corr(df["read_count_y"])
+                r_squared = correlation ** 2
+
+                region_text = " (CDS only)" if cds_only else ""
+                norm_text = " (RPM Normalized)" if normalize_by_total else ""
+
+                x_label = f"{file1} (RPM, Log₂)" if normalize_by_total else f"{file1} (Log₂)"
+                y_label = f"{file2} (RPM, Log₂)" if normalize_by_total else f"{file2} (Log₂)"
+
+                fig = px.scatter(
+                    df,
+                    x="read_count_x",
+                    y="read_count_y",
+                    hover_name="gene_name",
+                    title=f"Gene Read Counts{region_text}{norm_text} (Log₂ Scale): {file1} vs {file2}<br><sub>R = {correlation:.3f}, R² = {r_squared:.3f}</sub>",
+                    labels={
+                        "read_count_x": x_label,
+                        "read_count_y": y_label
+                    },
+                    log_x=True,
+                    log_y=True
+                )
+
+            plot_div = fig.to_html(full_html=False)
+
+    return render(request, "riboApp/log2GeneCounts.html", {
         "selected_genes": selected_genes,
         "parquet_files": parquet_files,
         "plot_div": plot_div,
@@ -856,12 +1054,12 @@ def load_selected_genes():
     return set(selected_genes)
 
 def get_available_parquet_files():
-    return [f for f in os.listdir(PARQUET_FOLDER) if f.endswith(".parquet")]
+    parquet_files, _ = get_cached_available_files()
+    return parquet_files
 
 def get_available_mrna_parquet_files():
-    if not os.path.exists(MRNA_FOLDER):
-        return []
-    return [f for f in os.listdir(MRNA_FOLDER) if f.endswith(".parquet")]
+    _, mrna_files = get_cached_available_files()
+    return mrna_files
 
 def get_bin_counts(selected_file):
     selected_genes = load_selected_genes()
@@ -1041,10 +1239,10 @@ def delta_analysis(request):
                         color="region",
                         hover_name="gene_name",
                         hover_data=["region"],
-                        title=f"Delta Analysis by Region: Ribo ({ribo_file1} - {ribo_file2}) vs mRNA ({mrna_file1} - {mrna_file2})<br><sub>Overall R = {correlation:.3f}, R² = {r_squared:.3f}</sub>",
+                        title=f"Delta Analysis by Region: Ribo ({ribo_file1} vs {ribo_file2}) vs mRNA ({mrna_file1} vs {mrna_file2})<br><sub>Overall R = {correlation:.3f}, R² = {r_squared:.3f}</sub>",
                         labels={
-                            "ribo_delta": f"Ribo Δ ({ribo_file1} - {ribo_file2})",
-                            "mrna_delta": f"mRNA Δ ({mrna_file1} - {mrna_file2})",
+                            "ribo_delta": f"Ribo Log₂ Fold Change ({ribo_file1}/{ribo_file2})",
+                            "mrna_delta": f"mRNA Log₂ Fold Change ({mrna_file1}/{mrna_file2})",
                             "region": "Genomic Region"
                         },
                         color_discrete_map=region_colors
@@ -1323,11 +1521,13 @@ def generate_stop_codon_periodicity(selected_files):
         return cached_result, None
 
     # Load P-site offsets (needed for read length filtering)
-    if not os.path.exists(OFFSET_CSV):
+    offsets_df = get_cached_psite_offsets()
+    if offsets_df.empty:
         return None, "P-site offset CSV file not found! Please configure P-site offsets first."
 
-    offsets_df = pd.read_csv(OFFSET_CSV)
-    offsets_df.columns = ["experiment", "read_length", "P_site_offset"]
+    # Ensure correct column names
+    if "P_site_offset" not in offsets_df.columns:
+        offsets_df.columns = ["experiment", "read_length", "P_site_offset"]
 
     # Process each selected file using EXACT same logic as process_metagene_data
     all_stop_data = []
@@ -1623,6 +1823,122 @@ def psite_offset_view(request):
 GTF_FILE = "media/gencode.vM25.annotation.gtf"  # Path to GTF file
 PARQUET_FOLDER = "media/parquetFiles/"          # Path where Parquet files are stored
 
+# ========================================
+# GLOBAL CACHE VARIABLES FOR OPTIMIZATION
+# ========================================
+
+# Cache for gene lengths (expensive GTF parsing)
+_GENE_LENGTHS_CACHE = None
+_GENE_LENGTHS_CACHE_TIMESTAMP = None
+
+# Cache for P-site offsets (frequently accessed)
+_PSITE_OFFSETS_CACHE = None
+_PSITE_OFFSETS_CACHE_TIMESTAMP = None
+
+# Cache for available files (avoid repeated directory scans)
+_AVAILABLE_FILES_CACHE = {
+    'parquet': None,
+    'mrna': None,
+    'timestamp': None
+}
+
+# Cache for GTF gene annotations (expensive parsing)
+_GTF_ANNOTATIONS_CACHE = None
+_GTF_ANNOTATIONS_CACHE_TIMESTAMP = None
+
+# Cache timeout in seconds (5 minutes)
+CACHE_TIMEOUT = 300
+
+# ========================================
+# GLOBAL CACHE HELPER FUNCTIONS
+# ========================================
+
+def get_cached_gene_lengths():
+    """Get gene lengths from global cache or calculate if needed"""
+    global _GENE_LENGTHS_CACHE, _GENE_LENGTHS_CACHE_TIMESTAMP
+
+    current_time = time.time()
+
+    # Check if cache is valid
+    if (_GENE_LENGTHS_CACHE is not None and
+        _GENE_LENGTHS_CACHE_TIMESTAMP is not None and
+        current_time - _GENE_LENGTHS_CACHE_TIMESTAMP < CACHE_TIMEOUT):
+        print("🚀 Using cached gene lengths")
+        return _GENE_LENGTHS_CACHE
+
+    # Calculate and cache gene lengths
+    print("📊 Calculating gene lengths from GTF...")
+    gene_lengths = calculate_gene_lengths(GTF_FILE)
+    _GENE_LENGTHS_CACHE = gene_lengths
+    _GENE_LENGTHS_CACHE_TIMESTAMP = current_time
+    print(f"💾 Cached gene lengths for {len(gene_lengths)} genes")
+    return gene_lengths
+
+def get_cached_psite_offsets():
+    """Get P-site offsets from global cache or load if needed"""
+    global _PSITE_OFFSETS_CACHE, _PSITE_OFFSETS_CACHE_TIMESTAMP
+
+    current_time = time.time()
+
+    # Check if cache is valid
+    if (_PSITE_OFFSETS_CACHE is not None and
+        _PSITE_OFFSETS_CACHE_TIMESTAMP is not None and
+        current_time - _PSITE_OFFSETS_CACHE_TIMESTAMP < CACHE_TIMEOUT):
+        print("🚀 Using cached P-site offsets")
+        return _PSITE_OFFSETS_CACHE
+
+    # Load and cache P-site offsets
+    print("📊 Loading P-site offsets from CSV...")
+    if os.path.exists(OFFSET_CSV):
+        offsets_df = pd.read_csv(OFFSET_CSV)
+        _PSITE_OFFSETS_CACHE = offsets_df
+        _PSITE_OFFSETS_CACHE_TIMESTAMP = current_time
+        print(f"💾 Cached P-site offsets for {len(offsets_df)} entries")
+        return offsets_df
+    else:
+        print("⚠️ P-site offset CSV not found")
+        return pd.DataFrame()
+
+def get_cached_available_files():
+    """Get available files from global cache or scan if needed"""
+    global _AVAILABLE_FILES_CACHE
+
+    current_time = time.time()
+
+    # Check if cache is valid
+    if (_AVAILABLE_FILES_CACHE['timestamp'] is not None and
+        current_time - _AVAILABLE_FILES_CACHE['timestamp'] < CACHE_TIMEOUT):
+        print("🚀 Using cached file lists")
+        return _AVAILABLE_FILES_CACHE['parquet'], _AVAILABLE_FILES_CACHE['mrna']
+
+    # Scan and cache file lists
+    print("📊 Scanning for available files...")
+    parquet_files = [f for f in os.listdir(PARQUET_FOLDER) if f.endswith(".parquet")] if os.path.exists(PARQUET_FOLDER) else []
+    mrna_files = [f for f in os.listdir(MRNA_FOLDER) if f.endswith(".parquet")] if os.path.exists(MRNA_FOLDER) else []
+
+    _AVAILABLE_FILES_CACHE['parquet'] = parquet_files
+    _AVAILABLE_FILES_CACHE['mrna'] = mrna_files
+    _AVAILABLE_FILES_CACHE['timestamp'] = current_time
+
+    print(f"💾 Cached {len(parquet_files)} parquet files and {len(mrna_files)} mRNA files")
+    return parquet_files, mrna_files
+
+def clear_global_caches():
+    """Clear all global caches - call when files are uploaded/deleted"""
+    global _GENE_LENGTHS_CACHE, _GENE_LENGTHS_CACHE_TIMESTAMP
+    global _PSITE_OFFSETS_CACHE, _PSITE_OFFSETS_CACHE_TIMESTAMP
+    global _AVAILABLE_FILES_CACHE, _GTF_ANNOTATIONS_CACHE, _GTF_ANNOTATIONS_CACHE_TIMESTAMP
+
+    _GENE_LENGTHS_CACHE = None
+    _GENE_LENGTHS_CACHE_TIMESTAMP = None
+    _PSITE_OFFSETS_CACHE = None
+    _PSITE_OFFSETS_CACHE_TIMESTAMP = None
+    _AVAILABLE_FILES_CACHE = {'parquet': None, 'mrna': None, 'timestamp': None}
+    _GTF_ANNOTATIONS_CACHE = None
+    _GTF_ANNOTATIONS_CACHE_TIMESTAMP = None
+
+    print("🧹 Cleared all global caches")
+
 def calculate_gene_lengths(gtf_file):
     if not os.path.exists(gtf_file):
         print("ERROR: GTF file not found!")
@@ -1796,17 +2112,26 @@ def get_delta_analysis_data(ribo_file1, ribo_file2, mrna_file1, mrna_file2):
             mrna_total1 = get_mrna_gene_counts_dict(mrna_file1)
             mrna_total2 = get_mrna_gene_counts_dict(mrna_file2)
 
-        all_genes = set(ribo_total1.keys()) | set(ribo_total2.keys()) | set(mrna_total1.keys()) | set(mrna_total2.keys())
+        all_genes = set(ribo_total1.keys()) & set(ribo_total2.keys()) & set(mrna_total1.keys()) & set(mrna_total2.keys())
         delta_data = []
         for gene in all_genes:
-            ribo_delta = ribo_total1.get(gene, 0) - ribo_total2.get(gene, 0)
-            mrna_delta = mrna_total1.get(gene, 0) - mrna_total2.get(gene, 0)
-            delta_data.append({
-                "gene_name": gene,
-                "ribo_delta": ribo_delta,
-                "mrna_delta": mrna_delta,
-                "region": "Total"  # Default region when no region data available
-            })
+            ribo_count1 = ribo_total1.get(gene, 0)
+            ribo_count2 = ribo_total2.get(gene, 0)
+            mrna_count1 = mrna_total1.get(gene, 0)
+            mrna_count2 = mrna_total2.get(gene, 0)
+
+            # Only include if all counts are positive (needed for log2 fold change)
+            if ribo_count1 > 0 and ribo_count2 > 0 and mrna_count1 > 0 and mrna_count2 > 0:
+                # Calculate log2 fold changes (add pseudocount to avoid log(0))
+                pseudocount = 1
+                ribo_delta = np.log2((ribo_count1 + pseudocount) / (ribo_count2 + pseudocount))
+                mrna_delta = np.log2((mrna_count1 + pseudocount) / (mrna_count2 + pseudocount))
+                delta_data.append({
+                    "gene_name": gene,
+                    "ribo_delta": ribo_delta,
+                    "mrna_delta": mrna_delta,
+                    "region": "Total"  # Default region when no region data available
+                })
         result_df = pd.DataFrame(delta_data)
         print(f"✅ Delta analysis data (no regions): {len(result_df)} genes")
         return result_df
@@ -1831,11 +2156,12 @@ def get_delta_analysis_data(ribo_file1, ribo_file2, mrna_file1, mrna_file2):
             mrna_count1 = mrna_counts1.get(gene, {}).get(region, 0)
             mrna_count2 = mrna_counts2.get(gene, {}).get(region, 0)
 
-            # Only include if at least one file has data for this gene-region combination
-            if ribo_count1 > 0 or ribo_count2 > 0 or mrna_count1 > 0 or mrna_count2 > 0:
-                # Calculate deltas (differences)
-                ribo_delta = ribo_count1 - ribo_count2
-                mrna_delta = mrna_count1 - mrna_count2
+            # Only include if both files have data for this gene-region combination (needed for log2 fold change)
+            if ribo_count1 > 0 and ribo_count2 > 0 and mrna_count1 > 0 and mrna_count2 > 0:
+                # Calculate log2 fold changes (add pseudocount to avoid log(0))
+                pseudocount = 1
+                ribo_delta = np.log2((ribo_count1 + pseudocount) / (ribo_count2 + pseudocount))
+                mrna_delta = np.log2((mrna_count1 + pseudocount) / (mrna_count2 + pseudocount))
 
                 delta_data.append({
                     "gene_name": gene,
@@ -1976,7 +2302,7 @@ def pca_gene_counts(request):
     #     print("Loaded PCA plot from cache.")
     #     return render(request, "riboApp/pca_plot.html", {"pca_plot": cached_plot})
 
-    gene_lengths = calculate_gene_lengths(GTF_FILE)
+    gene_lengths = get_cached_gene_lengths()
     if gene_lengths.empty:
         return render(request, "riboApp/error.html", {"error_message": "No gene lengths extracted from GTF!"})
     print(gene_lengths.head())
@@ -2032,11 +2358,10 @@ def pca_gene_counts(request):
 
     # Generate the interactive PCA plot using Plotly
     fig = px.scatter(
-        pca_df, x="PC1", y="PC2", text="file", color="PC1",
+        pca_df, x="PC1", y="PC2", hover_name="file", color="PC1",
         title=f"PCA of Gene Counts (RPKM Normalized)<br><sub>PC1: {pc1_var:.1f}% variance, PC2: {pc2_var:.1f}% variance</sub>",
         labels={"PC1": f"PC1 ({pc1_var:.1f}%)", "PC2": f"PC2 ({pc2_var:.1f}%)"}
     )
-    fig.update_traces(textposition="top center")
     pca_plot_html = fig.to_html(full_html=False)
 
     # Cache the result indefinitely (or set a timeout if you prefer)
@@ -2079,7 +2404,7 @@ def combined_pca_gene_counts(request):
 
     print("Combined PCA plot NOT found in cache. Recomputing...")
 
-    gene_lengths = calculate_gene_lengths(GTF_FILE)
+    gene_lengths = get_cached_gene_lengths()
     if gene_lengths.empty:
         return render(request, "riboApp/error.html", {"error_message": "No gene lengths extracted from GTF!"})
 
@@ -2146,12 +2471,11 @@ def combined_pca_gene_counts(request):
 
     # Generate the interactive PCA plot with color coding by file type
     fig = px.scatter(
-        pca_df, x="PC1", y="PC2", text="file", color="file_type",
+        pca_df, x="PC1", y="PC2", hover_name="file", color="file_type",
         title=f"Combined PCA of Gene Counts (RPKM Normalized): Riboseq vs mRNA<br><sub>PC1: {pc1_var:.1f}% variance, PC2: {pc2_var:.1f}% variance</sub>",
         labels={"PC1": f"PC1 ({pc1_var:.1f}%)", "PC2": f"PC2 ({pc2_var:.1f}%)"},
         color_discrete_map={"Riboseq": "#1f77b4", "mRNA": "#ff7f0e"}
     )
-    fig.update_traces(textposition="top center")
     pca_plot_html = fig.to_html(full_html=False)
 
     # Cache the result
