@@ -41,6 +41,36 @@
 
     <hr>
 
+    <!-- Preprocessing Section -->
+    <div style="background-color: rgba(255, 193, 7, 0.1); border: 2px solid rgba(255, 193, 7, 0.5); border-radius: 5px; padding: 20px; margin-bottom: 20px;">
+        <h2 style="color: #f57c00; margin-top: 0;">⚡ Speed Up Your Analysis</h2>
+        <p style="font-size: 16px; margin-bottom: 15px;">
+            <strong>Pre-compute all analyses</strong> to make plotting instant (< 1 second instead of 10-12 seconds).
+        </p>
+        <p style="margin-bottom: 15px;">
+            This will:
+        </p>
+        <ul style="margin-bottom: 15px;">
+            <li>Load all parquet files into memory</li>
+            <li>Pre-compute analysis results for all files</li>
+            <li>Cache everything for instant plot generation</li>
+        </ul>
+        <p style="margin-bottom: 15px;">
+            <strong>Time:</strong> 5-10 minutes (one-time) | <strong>Benefit:</strong> All future plots are instant ⚡
+        </p>
+        <form method="post" action="{% url 'preprocess_all_files' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-warning" style="font-size: 18px; padding: 12px 24px;">
+                🚀 Preprocess All Files
+            </button>
+        </form>
+        <p style="margin-top: 10px; font-size: 14px; color: #666;">
+            <em>Note: Run this after uploading new files or when cache expires (5 minutes)</em>
+        </p>
+    </div>
+
+    <hr>
+
     <h3>Riboseq-Only Analysis Options</h3>
     <p>Analyze riboseq data independently:</p>
 
@@ -78,6 +108,12 @@
         <a href="{% url 'psite_metagene' %}">
             <button style="padding: 10px; background-color: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">
                 P-site Metagene Plots
+            </button>
+        </a>
+
+        <a href="{% url 'stopCodonReadthrough' %}">
+            <button style="padding: 10px; background-color: #6f42c1; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                Stop Codon Readthrough (by Type)
             </button>
         </a>
     </div>

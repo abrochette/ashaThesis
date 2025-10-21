@@ -1,0 +1,119 @@
+{% extends "riboApp/base.html" %}
+
+{% block title %}Stop Codon Readthrough Analysis{% endblock %}
+
+{% block content %}
+<div style="max-width: 1400px; margin: 0 auto; padding: 20px;">
+    <h1 style="color: #2c3e50; margin-bottom: 10px;">🧬 Stop Codon Readthrough Analysis</h1>
+    <p style="color: #666; margin-bottom: 30px;">
+        Analyze ribosome readthrough patterns separated by stop codon type (TAA, TAG, TGA).
+        This analysis shows P-site coverage around stop codons, grouped by the specific stop codon sequence.
+    </p>
+
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+        <h3 style="margin-top: 0; color: #2c3e50;">📊 About This Analysis</h3>
+        <ul style="color: #555; line-height: 1.8;">
+            <li><strong>TAA (Ochre)</strong> - Typically shows lowest readthrough rates</li>
+            <li><strong>TAG (Amber)</strong> - Shows intermediate readthrough rates</li>
+            <li><strong>TGA (Opal)</strong> - Typically shows highest readthrough rates</li>
+            <li><strong>Readthrough Region</strong> - Positive positions (right of stop codon) indicate continued translation</li>
+            <li><strong>P-site Adjusted</strong> - Uses P-site offsets to accurately position ribosomes</li>
+        </ul>
+    </div>
+
+    <form method="post" style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        {% csrf_token %}
+        
+        <h3 style="margin-top: 0; color: #2c3e50;">Select Riboseq Files</h3>
+        
+        {% if parquet_files %}
+            <div style="margin: 20px 0;">
+                <label style="display: block; margin-bottom: 10px; font-weight: bold; color: #555;">
+                    Available Files:
+                </label>
+                <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 15px; border-radius: 4px; background: #fafafa;">
+                    {% for file in parquet_files %}
+                        <label style="display: block; padding: 8px; margin: 5px 0; background: white; border-radius: 4px; cursor: pointer; transition: background 0.2s;">
+                            <input type="checkbox" name="selected_files" value="{{ file }}" 
+                                   {% if file in selected_files %}checked{% endif %}
+                                   style="margin-right: 10px;">
+                            <span style="font-family: monospace; color: #333;">{{ file }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <button type="submit" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s;">
+                Generate Readthrough Analysis
+            </button>
+        {% else %}
+            <p style="color: #e74c3c; padding: 15px; background: #fee; border-radius: 4px; border-left: 4px solid #e74c3c;">
+                ⚠️ No parquet files found. Please upload riboseq data files first.
+            </p>
+        {% endif %}
+    </form>
+
+    {% if error_message %}
+        <div style="background: #fee; color: #c33; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #e74c3c;">
+            <strong>❌ Error:</strong> {{ error_message }}
+        </div>
+    {% endif %}
+
+    {% if plot_html %}
+        <div style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="color: #2c3e50; margin: 0;">📈 Readthrough Analysis Results</h2>
+                {% if has_csv_data %}
+                    <a href="{% url 'download_stop_codon_csv' %}" style="text-decoration: none;">
+                        <button type="button" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 10px 20px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s;">
+                            📥 Download CSV Data
+                        </button>
+                    </a>
+                {% endif %}
+            </div>
+
+            <div style="background: #e8f4f8; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #3498db;">
+                <h4 style="margin-top: 0; color: #2c3e50;">💡 Interpretation Guide:</h4>
+                <ul style="color: #555; line-height: 1.8; margin-bottom: 0;">
+                    <li><strong>Position 0</strong> - The stop codon location (red dashed line)</li>
+                    <li><strong>Negative positions</strong> - Upstream of stop codon (normal translation)</li>
+                    <li><strong>Positive positions</strong> - Downstream of stop codon (readthrough region, shaded gray)</li>
+                    <li><strong>Higher signal in readthrough region</strong> - More readthrough occurring</li>
+                    <li><strong>Compare curves</strong> - Different stop codons may show different readthrough rates</li>
+                </ul>
+            </div>
+
+            {{ plot_html|safe }}
+        </div>
+
+        <div style="background: #fff3cd; padding: 15px; border-radius: 6px; border-left: 4px solid #ffc107; margin-top: 20px;">
+            <h4 style="margin-top: 0; color: #856404;">📝 Notes:</h4>
+            <ul style="color: #856404; line-height: 1.8; margin-bottom: 0;">
+                <li>This analysis requires P-site offsets to be configured</li>
+                <li>Only CDS regions are analyzed</li>
+                <li>Genes are automatically grouped by their stop codon sequence from the transcript FASTA</li>
+                <li>Read counts are normalized to RPM (Reads Per Million) for fair comparison</li>
+                <li>The number of genes for each stop codon type is shown in the legend</li>
+            </ul>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    
+    label:has(input[type="checkbox"]):hover {
+        background: #f0f0f0 !important;
+    }
+    
+    input[type="checkbox"] {
+        cursor: pointer;
+        width: 16px;
+        height: 16px;
+    }
+</style>
+{% endblock %}
+

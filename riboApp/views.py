@@ -1820,8 +1820,293 @@ def psite_offset_view(request):
     )
 
 
+def stop_codon_readthrough(request):
+    """Stop codon readthrough analysis separated by stop codon type (TAA/TAG/TGA)"""
+    # Use new modular system
+    from .analysis import stop_codon_readthrough as scr_module
+
+    parquet_files = get_available_parquet_files()
+    plot_html = None
+    error_message = None
+    selected_files = []
+
+    has_csv_data = False
+
+    if request.method == "POST":
+        selected_files = request.POST.getlist("selected_files")
+
+        if selected_files:
+            # Generate plots using new modular system
+            plot_html, error_message, csv_data = scr_module.generate_stop_codon_readthrough_plots(selected_files)
+
+            # Store CSV data in session for download
+            if csv_data is not None:
+                request.session['stop_codon_csv_data'] = csv_data.to_json()
+                has_csv_data = True
+        else:
+            error_message = "No files selected!"
+
+    return render(
+        request,
+        "riboApp/stopCodonReadthrough.html",
+        {
+            "parquet_files": parquet_files,
+            "plot_html": plot_html,
+            "error_message": error_message,
+            "selected_files": selected_files,
+            "has_csv_data": has_csv_data,
+        },
+    )
+
+
+def download_stop_codon_csv(request):
+    """Download CSV data for stop codon readthrough analysis"""
+    csv_json = request.session.get('stop_codon_csv_data')
+
+    if not csv_json:
+        return HttpResponse("No data available for download", status=404)
+
+    # Convert JSON back to DataFrame
+    df = pd.read_json(csv_json)
+
+    # Create CSV response
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="stop_codon_readthrough_data.csv"'
+
+    # Write CSV
+    df.to_csv(response, index=False)
+
+    return response
+
+
+def generate_stop_codon_readthrough_by_type(selected_files):
+    """Generate stop codon periodicity plots separated by stop codon type"""
+    if not selected_files:
+        return None, "No files selected!"
+
+    # Get stop codon types from cache
+    stop_codon_types = get_cached_stop_codons()
+    if not stop_codon_types:
+        return None, "Could not extract stop codon types from FASTA file!"
+
+    # Load P-site offsets
+    offsets_df = get_cached_psite_offsets()
+    if offsets_df.empty:
+        return None, "P-site offset CSV file not found! Please configure P-site offsets first."
+
+    # Ensure correct column names
+    if "P_site_offset" not in offsets_df.columns:
+        offsets_df.columns = ["experiment", "read_length", "P_site_offset"]
+
+    # Process each selected file
+    all_stop_data = {'TAA': [], 'TAG': [], 'TGA': []}
+
+    for selected_file in selected_files:
+        file_basename = os.path.splitext(selected_file)[0]
+        file_path = os.path.join(PARQUET_FOLDER, selected_file)
+
+        print(f"Processing stop codon readthrough for {selected_file}")
+
+        # Get P-site offsets for this experiment
+        file_offsets = offsets_df[offsets_df["experiment"] == file_basename]
+        if file_offsets.empty:
+            print(f"Warning: No P-site offsets found for {file_basename}")
+            continue
+
+        try:
+            # Read parquet file
+            df = pq.read_table(file_path, columns=[
+                "gene_name", "start_position", "end_position", "read_length", "read_count", "region"
+            ]).to_pandas()
+
+            # Filter for CDS and UTR3 regions (UTR3 contains readthrough reads!)
+            df = df[df["region"].isin(["CDS", "UTR3"])]
+
+            if df.empty:
+                print(f"Warning: No CDS/UTR3 data found in {selected_file}")
+                continue
+
+            # Calculate total reads for normalization
+            total_reads = df["read_count"].sum()
+
+            # Process stop codon data for each stop codon type
+            for stop_type in ['TAA', 'TAG', 'TGA']:
+                # Filter genes by stop codon type
+                genes_with_stop_type = [gene for gene, sc in stop_codon_types.items() if sc == stop_type]
+
+                if not genes_with_stop_type:
+                    continue
+
+                # Filter dataframe to only include genes with this stop codon type
+                df_filtered = df[df["gene_name"].isin(genes_with_stop_type)]
+
+                if df_filtered.empty:
+                    continue
+
+                # Process metagene data for this stop codon type
+                stop_data = process_metagene_data(
+                    df_filtered, file_offsets, file_basename, total_reads, "stop", None
+                )
+
+                if not stop_data.empty:
+                    # Rename columns to match what the plot function expects
+                    stop_data = stop_data.rename(columns={
+                        'shifted_position': 'position',
+                        'avg_count': 'normalized_count'
+                    })
+                    # Add stop codon type column
+                    stop_data['stop_codon_type'] = stop_type
+                    all_stop_data[stop_type].append(stop_data)
+
+        except Exception as e:
+            print(f"Error processing {selected_file}: {str(e)}")
+            continue
+
+    # Check if we have data for any stop codon type
+    if not any(all_stop_data.values()):
+        return None, "No valid data found for selected files", None
+
+    # Create combined plot with all three stop codon types
+    plot_html = create_stop_codon_comparison_plot(all_stop_data)
+
+    # Combine all data for CSV export
+    all_data_combined = []
+    for stop_type in ['TAA', 'TAG', 'TGA']:
+        if all_stop_data[stop_type]:
+            combined = pd.concat(all_stop_data[stop_type], ignore_index=True)
+            all_data_combined.append(combined)
+
+    csv_data = pd.concat(all_data_combined, ignore_index=True) if all_data_combined else None
+
+    return plot_html, None, csv_data
+
+
+def create_stop_codon_comparison_plot(all_stop_data):
+    """Create separate plots for each sample, with each plot showing TAA/TAG/TGA lines"""
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+
+    # Colors for each stop codon type
+    colors = {
+        'TAA': '#1f77b4',  # Blue (lowest readthrough expected)
+        'TAG': '#ff7f0e',  # Orange (intermediate)
+        'TGA': '#2ca02c',  # Green (highest readthrough expected)
+    }
+
+    # First, organize data by experiment
+    experiments_data = {}
+
+    for stop_type in ['TAA', 'TAG', 'TGA']:
+        if not all_stop_data[stop_type]:
+            continue
+
+        for df in all_stop_data[stop_type]:
+            # DEBUG: Print sample of data
+            print(f"\n🔍 DEBUG {stop_type} data sample:")
+            print(df[['position', 'experiment', 'normalized_count']].head(10))
+
+            # Group by experiment
+            for experiment in df['experiment'].unique():
+                if experiment not in experiments_data:
+                    experiments_data[experiment] = {}
+
+                exp_data = df[df['experiment'] == experiment].copy()
+                exp_data = exp_data.sort_values('position')
+
+                # DEBUG: Print position range
+                print(f"  {experiment} - {stop_type}: positions from {exp_data['position'].min()} to {exp_data['position'].max()}")
+
+                experiments_data[experiment][stop_type] = exp_data
+
+    # Get list of experiments
+    experiments = sorted(experiments_data.keys())
+    num_experiments = len(experiments)
+
+    if num_experiments == 0:
+        return "<p>No data available for plotting</p>"
+
+    # Create subplots - one row per experiment
+    fig = make_subplots(
+        rows=num_experiments,
+        cols=1,
+        subplot_titles=[f"<b>{exp}</b>" for exp in experiments],
+        vertical_spacing=0.08,
+        shared_xaxes=True
+    )
+
+    # Add traces for each experiment
+    for idx, experiment in enumerate(experiments, start=1):
+        exp_data = experiments_data[experiment]
+
+        for stop_type in ['TAA', 'TAG', 'TGA']:
+            if stop_type not in exp_data:
+                continue
+
+            data = exp_data[stop_type]
+
+            # Add trace
+            fig.add_trace(
+                go.Scatter(
+                    x=data['position'],
+                    y=data['normalized_count'],
+                    mode='lines+markers',
+                    name=stop_type,
+                    line=dict(color=colors[stop_type], width=2),
+                    marker=dict(size=3),
+                    legendgroup=stop_type,  # Group legends by stop codon type
+                    showlegend=(idx == 1),  # Only show legend for first subplot
+                    hovertemplate=f'<b>{stop_type}</b><br>' +
+                                 'Position: %{x}<br>' +
+                                 'Count (RPM): %{y:.2f}<br>' +
+                                 '<extra></extra>'
+                ),
+                row=idx, col=1
+            )
+
+        # Add vertical line at stop codon position (0) for each subplot
+        fig.add_vline(
+            x=0, line_dash="dash", line_color="red", line_width=1,
+            row=idx, col=1
+        )
+
+        # Add shaded region for readthrough area
+        fig.add_vrect(
+            x0=0, x1=60,
+            fillcolor="lightgray", opacity=0.15,
+            layer="below", line_width=0,
+            row=idx, col=1
+        )
+
+    # Update layout
+    fig.update_layout(
+        title="Stop Codon Readthrough Analysis by Sample<br><sub>Each panel shows TAA, TAG, and TGA for one sample</sub>",
+        hovermode='x unified',
+        template='plotly_white',
+        height=400 * num_experiments,  # Scale height based on number of experiments
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5
+        )
+    )
+
+    # Update x-axes
+    fig.update_xaxes(title_text="Position Relative to Stop Codon (nt)", row=num_experiments, col=1)
+
+    # Update y-axes
+    for idx in range(1, num_experiments + 1):
+        fig.update_yaxes(title_text="Count (RPM)", row=idx, col=1)
+
+    return fig.to_html(full_html=False)
+
+
 GTF_FILE = "media/gencode.vM25.annotation.gtf"  # Path to GTF file
 PARQUET_FOLDER = "media/parquetFiles/"          # Path where Parquet files are stored
+TRANSCRIPTS_FASTA = "media/gencode.vM25.transcripts.fa"  # Path to transcript sequences
+GENOME_FASTA = "media/GRCm38.primary_assembly.genome.fa"  # Path to genome sequence
+STOP_CODON_TSV = "media/stopcodons.gene_stopcodons.per_gene_majority.tsv"  # Path to stop codon annotations
 
 # ========================================
 # GLOBAL CACHE VARIABLES FOR OPTIMIZATION
@@ -1846,6 +2131,12 @@ _AVAILABLE_FILES_CACHE = {
 _GTF_ANNOTATIONS_CACHE = None
 _GTF_ANNOTATIONS_CACHE_TIMESTAMP = None
 
+# Cache for stop codon types (expensive FASTA parsing)
+_STOP_CODON_CACHE = None
+_STOP_CODON_CACHE_TIMESTAMP = None
+_STOP_CODON_POSITIONS_CACHE = None
+_STOP_CODON_POSITIONS_CACHE_TIMESTAMP = None
+
 # Cache timeout in seconds (5 minutes)
 CACHE_TIMEOUT = 300
 
@@ -1854,25 +2145,10 @@ CACHE_TIMEOUT = 300
 # ========================================
 
 def get_cached_gene_lengths():
-    """Get gene lengths from global cache or calculate if needed"""
-    global _GENE_LENGTHS_CACHE, _GENE_LENGTHS_CACHE_TIMESTAMP
-
-    current_time = time.time()
-
-    # Check if cache is valid
-    if (_GENE_LENGTHS_CACHE is not None and
-        _GENE_LENGTHS_CACHE_TIMESTAMP is not None and
-        current_time - _GENE_LENGTHS_CACHE_TIMESTAMP < CACHE_TIMEOUT):
-        print("🚀 Using cached gene lengths")
-        return _GENE_LENGTHS_CACHE
-
-    # Calculate and cache gene lengths
-    print("📊 Calculating gene lengths from GTF...")
-    gene_lengths = calculate_gene_lengths(GTF_FILE)
-    _GENE_LENGTHS_CACHE = gene_lengths
-    _GENE_LENGTHS_CACHE_TIMESTAMP = current_time
-    print(f"💾 Cached gene lengths for {len(gene_lengths)} genes")
-    return gene_lengths
+    """Get gene lengths from genome cache or calculate if needed"""
+    # Use the new genome_cache module which handles pickle caching
+    from riboApp.analysis import genome_cache
+    return genome_cache.load_gene_lengths()
 
 def get_cached_psite_offsets():
     """Get P-site offsets from global cache or load if needed"""
@@ -1936,32 +2212,165 @@ def clear_global_caches():
     _AVAILABLE_FILES_CACHE = {'parquet': None, 'mrna': None, 'timestamp': None}
     _GTF_ANNOTATIONS_CACHE = None
     _GTF_ANNOTATIONS_CACHE_TIMESTAMP = None
+    _STOP_CODON_CACHE = None
+    _STOP_CODON_CACHE_TIMESTAMP = None
 
     print("🧹 Cleared all global caches")
 
+def get_cached_stop_codons():
+    """Get stop codon types from global cache or load from TSV if needed"""
+    global _STOP_CODON_CACHE, _STOP_CODON_CACHE_TIMESTAMP
+
+    current_time = time.time()
+
+    # Check if cache is valid
+    if (_STOP_CODON_CACHE is not None and
+        _STOP_CODON_CACHE_TIMESTAMP is not None and
+        current_time - _STOP_CODON_CACHE_TIMESTAMP < CACHE_TIMEOUT):
+        print("🚀 Using cached stop codon types")
+        return _STOP_CODON_CACHE
+
+    # Load and cache stop codon types from TSV
+    print("📊 Loading stop codon types from TSV...")
+    stop_codons = load_stop_codons_from_tsv(STOP_CODON_TSV)
+    _STOP_CODON_CACHE = stop_codons
+    _STOP_CODON_CACHE_TIMESTAMP = current_time
+    print(f"💾 Cached stop codon types for {len(stop_codons)} genes")
+    return stop_codons
+
+def load_stop_codons_from_tsv(tsv_file):
+    """Load stop codon annotations from TSV file
+
+    Returns a dictionary: {gene_name: stop_codon_type}
+    where stop_codon_type is 'TAA', 'TAG', or 'TGA'
+
+    TSV format: gene_name\tstop_codon (tab-separated, no header)
+    """
+    if not os.path.exists(tsv_file):
+        print(f"❌ Stop codon TSV file not found: {tsv_file}")
+        return {}
+
+    stop_codons = {}
+    valid_stop_codons = {'TAA', 'TAG', 'TGA'}
+
+    print(f"📖 Reading stop codon annotations from: {tsv_file}")
+
+    with open(tsv_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+
+            parts = line.split('\t')
+            if len(parts) != 2:
+                continue
+
+            gene_name = parts[0]
+            stop_codon = parts[1].upper()
+
+            # Only store valid stop codons
+            if stop_codon in valid_stop_codons:
+                stop_codons[gene_name] = stop_codon
+
+    print(f"✅ Loaded stop codons for {len(stop_codons)} genes")
+
+    # Print distribution
+    taa_count = sum(1 for sc in stop_codons.values() if sc == 'TAA')
+    tag_count = sum(1 for sc in stop_codons.values() if sc == 'TAG')
+    tga_count = sum(1 for sc in stop_codons.values() if sc == 'TGA')
+    print(f"   TAA: {taa_count}, TAG: {tag_count}, TGA: {tga_count}")
+
+    return stop_codons
+
+
+def get_cached_stop_codon_positions():
+    """Get stop codon positions from cache or load from GTF"""
+    global _STOP_CODON_POSITIONS_CACHE, _STOP_CODON_POSITIONS_CACHE_TIMESTAMP
+
+    # Check if cache is valid (5 minutes)
+    if _STOP_CODON_POSITIONS_CACHE is not None and _STOP_CODON_POSITIONS_CACHE_TIMESTAMP is not None:
+        if time.time() - _STOP_CODON_POSITIONS_CACHE_TIMESTAMP < 300:
+            print("🚀 Using cached stop codon positions")
+            return _STOP_CODON_POSITIONS_CACHE
+
+    # Load from GTF
+    print("📊 Loading stop codon positions from GTF...")
+    positions = load_stop_codon_positions_from_gtf()
+    return positions
+
+
+def load_stop_codon_positions_from_gtf():
+    """Extract stop codon positions from GTF file (now uses genome cache)
+
+    Returns a dictionary: {gene_name: stop_codon_position}
+    where stop_codon_position is the genomic coordinate of the stop codon
+    """
+    from riboApp.analysis import genome_cache
+
+    # Load GTF data from cache
+    gtf_data = genome_cache.load_gtf_data()
+
+    if gtf_data is None or gtf_data.empty:
+        print("❌ Could not load GTF data")
+        return {}
+
+    stop_positions = {}
+
+    # Filter for stop_codon features
+    stop_codon_data = gtf_data[gtf_data["feature"] == "stop_codon"]
+
+    for _, row in stop_codon_data.iterrows():
+        # Extract gene_name from attributes
+        gene_name = None
+        attrs = row["attribute"]
+        for attr in attrs.split(';'):
+            attr = attr.strip()
+            if attr.startswith('gene_name'):
+                gene_name = attr.split('"')[1]
+                break
+
+        if not gene_name:
+            continue
+
+        # For stop codon, we want the position where the ribosome P-site would be
+        # The stop codon is 3 nucleotides, we want the first nucleotide
+        strand = row["strand"]
+        if strand == '+':
+            # For positive strand, stop codon starts at 'start'
+            stop_pos = row["start"]
+        else:
+            # For negative strand, stop codon starts at 'end'
+            stop_pos = row["end"]
+
+        # Store the stop codon position for this gene
+        # If gene has multiple transcripts, we'll use the first one we encounter
+        if gene_name not in stop_positions:
+            stop_positions[gene_name] = stop_pos
+
+    print(f"✅ Loaded stop codon positions for {len(stop_positions)} genes")
+    return stop_positions
+
+
 def calculate_gene_lengths(gtf_file):
-    if not os.path.exists(gtf_file):
-        print("ERROR: GTF file not found!")
-        return pd.DataFrame()  # Return empty DataFrame to prevent crashes
+    """
+    Get gene lengths from genome cache.
+    This now uses the pickle-cached version for instant loading.
+    """
+    from riboApp.analysis import genome_cache
 
-    col_names = ["seqname", "source", "feature", "start", "end", "score", "strand", "frame", "attribute"]
-    gtf_data = pd.read_csv(gtf_file, sep="\t", names=col_names, comment="#")
+    gene_lengths_dict = genome_cache.load_gene_lengths()
 
-    # Keep only exons
-    exon_data = gtf_data[gtf_data["feature"] == "exon"].copy()
+    if not gene_lengths_dict:
+        print("ERROR: Could not load gene lengths!")
+        return pd.DataFrame()
 
-    # Extract gene_name from attribute
-    def extract_gene_name(attr):
-        match = re.search(r'gene_name\s+"([^"]+)"', attr)
-        return match.group(1) if match else None  # Return None if not found
+    # Convert dict to DataFrame format expected by callers
+    gene_lengths = pd.DataFrame([
+        {"gene_name": gene, "length_kb": length / 1000}
+        for gene, length in gene_lengths_dict.items()
+    ])
 
-    exon_data["gene_name"] = exon_data["attribute"].apply(extract_gene_name)
-    exon_data.dropna(subset=["gene_name"], inplace=True)
-
-    exon_data["length"] = exon_data["end"] - exon_data["start"] + 1
-    gene_lengths = exon_data.groupby("gene_name", as_index=False)["length"].sum()
-    gene_lengths["length_kb"] = gene_lengths["length"] / 1000
-    print(f"Extracted gene lengths for {len(gene_lengths)} genes.")
+    print(f"Loaded gene lengths for {len(gene_lengths)} genes from cache.")
     return gene_lengths[["gene_name", "length_kb"]]
 
 def process_parquet_file_gene_counts(file_path):
@@ -2788,13 +3197,29 @@ def generate_psite_metagene_plots(selected_files, selected_genes=None):
     return start_plot_html, stop_plot_html
 
 def process_metagene_data(df, file_offsets, experiment_name, total_reads, site_type, selected_genes=None):
-    """Process parquet data to create metagene coverage around start/stop codons"""
+    """Process parquet data to create metagene coverage around start/stop codons
+
+    Note: Parquet files use transcript coordinates (not genomic coordinates).
+    For stop codon analysis, we find the CDS end boundary for each gene.
+    """
 
     # Filter by selected genes if provided
     if selected_genes:
         df = df[df["gene_name"].isin(selected_genes)]
         if df.empty:
             return pd.DataFrame()
+
+    # For stop codon analysis, we need to find the CDS end position for each gene
+    # Do this BEFORE filtering to CDS only
+    cds_end_positions = {}
+    if site_type == "stop":
+        for gene_name in df["gene_name"].unique():
+            gene_data = df[df["gene_name"] == gene_name]
+            cds_data = gene_data[gene_data["region"] == "CDS"]
+            if not cds_data.empty:
+                # The stop codon is at the end of the CDS region
+                # Use the maximum end_position in the CDS as the stop codon position
+                cds_end_positions[gene_name] = cds_data["end_position"].max()
 
     # Create offset mapping
     length_to_offset = dict(zip(file_offsets["read_length"], file_offsets["P_site_offset"]))
@@ -2817,10 +3242,16 @@ def process_metagene_data(df, file_offsets, experiment_name, total_reads, site_t
 
     metagene_data = []
 
+    total_genes = df_filtered["gene_name"].nunique()
+    genes_processed = 0
+    genes_skipped = 0
+
     # Group by gene to get start/stop positions
     for gene_name, gene_df in df_filtered.groupby("gene_name"):
         if len(gene_df) < 10:  # Skip genes with too few reads
+            genes_skipped += 1
             continue
+        genes_processed += 1
 
         if site_type == "start":
             # Use the minimum P-site position as the start codon reference
@@ -2828,15 +3259,24 @@ def process_metagene_data(df, file_offsets, experiment_name, total_reads, site_t
             # Look at positions from -30 to +62 relative to start
             position_range = range(-30, 63)
         else:  # stop
-            # For stop codon, we need to find the actual CDS end
-            # Use P-site positions and find the end of the CDS region
-            # The stop codon should be near the end of the CDS
-            p_sites = gene_df["p_site"].sort_values()
-            # Use a position that's likely to be near the stop codon
-            # Take the 95th percentile of P-site positions as stop codon reference
-            reference_pos = int(p_sites.quantile(0.95))
-            # Look at positions from -2 to +60 relative to stop codon
-            position_range = range(-2, 61)
+            # For stop codon in transcript coordinates:
+            # The parquet files use transcript coordinates (not genomic)
+            # The stop codon is at the END of the CDS region
+            # Use the pre-calculated CDS end position for this gene
+            if gene_name in cds_end_positions:
+                reference_pos = cds_end_positions[gene_name]
+            else:
+                # Fallback: use max p_site in CDS region
+                cds_reads = gene_df[gene_df["region"] == "CDS"]
+                if not cds_reads.empty:
+                    reference_pos = cds_reads["end_position"].max()
+                else:
+                    reference_pos = gene_df["p_site"].max()
+
+            # Look at positions from -60 to +30 relative to stop codon
+            # Negative positions = upstream of stop (in CDS)
+            # Positive positions = downstream of stop (readthrough into UTR3)
+            position_range = range(-60, 31)
 
         # Calculate relative positions
         gene_df = gene_df.copy()
@@ -2862,6 +3302,14 @@ def process_metagene_data(df, file_offsets, experiment_name, total_reads, site_t
     # Convert to DataFrame and aggregate across genes for each experiment
     metagene_df = pd.DataFrame(metagene_data)
 
+    # DEBUG: Print sample of metagene data before aggregation
+    print(f"\n🔍 DEBUG process_metagene_data - site_type={site_type}, experiment={experiment_name}")
+    print(f"  Total genes in input: {total_genes}")
+    print(f"  Genes processed: {genes_processed}")
+    print(f"  Genes skipped (< 10 reads): {genes_skipped}")
+    print(f"  Total data points: {len(metagene_df)}")
+    print(f"  Position range: {metagene_df['shifted_position'].min()} to {metagene_df['shifted_position'].max()}")
+
     if selected_genes:
         # When using selected genes, combine all genes into a single line per experiment
         # Sum the counts across all selected genes for each position
@@ -2869,8 +3317,9 @@ def process_metagene_data(df, file_offsets, experiment_name, total_reads, site_t
         # Add a label to indicate this is selected genes
         result["experiment"] = result["experiment"] + " (Selected Genes)"
     else:
-        # Average across all genes for each position and experiment (original behavior)
-        result = metagene_df.groupby(["shifted_position", "experiment"], as_index=False)["avg_count"].mean()
+        # Sum across all genes for each position and experiment
+        # This is the correct way to do metagene analysis - sum the normalized counts
+        result = metagene_df.groupby(["shifted_position", "experiment"], as_index=False)["avg_count"].sum()
 
     return result
 
@@ -3501,13 +3950,29 @@ def clear_file_cache(filename, file_type="riboseq"):
 
 
 def preprocess_all_files_view(request):
-    """View to trigger preprocessing of all uploaded files"""
+    """View to trigger preprocessing of all uploaded files AND preload all data"""
     if request.method == "POST":
         try:
+            # Import the new data loader
+            from .analysis import data_loader
+
+            # Step 1: Preload ALL raw data (caches GTF/FASTA only)
+            # This is fast: ~45 seconds
+            data_loader.preload_all_data()
+
+            # REMOVED: precompute_all_analyses()
+            # We don't precompute all analyses anymore!
+            # Instead, analyses are computed on-demand when user requests plots.
+            # This keeps preprocessing fast (45 seconds instead of 15+ minutes).
+
+            # Also trigger old preprocessing for compatibility
             preprocess_all_uploaded_files()
-            messages.success(request, "All files have been preprocessed successfully! Analysis should now be much faster.")
+
+            messages.success(request, "All files have been preprocessed! GTF data is cached. Analyses will be computed on-demand when you generate plots.")
         except Exception as e:
             messages.error(request, f"Error during preprocessing: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
     return redirect('upload_parquet')
 
