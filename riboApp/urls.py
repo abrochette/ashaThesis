@@ -37,6 +37,7 @@ urlpatterns = [
     # Performance optimization endpoints
     path("preprocess_all_files/", views.preprocess_all_files_view, name="preprocess_all_files"),
     path("update_psite_caches/", views.update_psite_caches_view, name="update_psite_caches"),
+    path("clear_delta_analysis_cache/", views.clear_delta_analysis_cache_view, name="clear_delta_analysis_cache"),
     path("clear_all_cache/", views.clear_all_cache_view, name="clear_all_cache"),
 ]
 

@@ -289,8 +289,11 @@ def locatePsites(response):
 
 
 def get_gene_reads(gene_name):
-    parquet_folder = "media/parquetFiles/"  # Adjust as needed
-    files = os.listdir(parquet_folder)
+    """Get reads for a specific gene from all parquet files"""
+    from .analysis.data_getters import get_available_parquet_files
+
+    parquet_folder = "media/parquetFiles/"
+    files = get_available_parquet_files()
 
     all_data = []
 
@@ -302,7 +305,8 @@ def get_gene_reads(gene_name):
 
         # Filter for the requested gene
         filtered_df = df[df["gene_name"] == gene_name]
-        all_data.append(filtered_df)
+        if not filtered_df.empty:
+            all_data.append(filtered_df)
 
     return pd.concat(all_data, ignore_index=True)
 # Upload and store all Parquet data
@@ -494,111 +498,9 @@ def save_selected_genes(request):
 
 
 
-def load_or_build_gene_counts_dict(parquet_filename):
-    parquet_folder = "media/parquetFiles/"
-    pickle_folder = "media/parquetPickles/"
-    os.makedirs(pickle_folder, exist_ok=True)
-
-    parquet_path = os.path.join(parquet_folder, parquet_filename)
-    base_name = os.path.splitext(parquet_filename)[0]
-    pickle_path = os.path.join(pickle_folder, f"{base_name}.pkl")
-
-    if os.path.exists(pickle_path):
-        parquet_mtime = os.path.getmtime(parquet_path)
-        pickle_mtime = os.path.getmtime(pickle_path)
-        if pickle_mtime > parquet_mtime:
-            with open(pickle_path, "rb") as f:
-                print(f"Loading gene_counts_dict from pickle for {parquet_filename}")
-                return pickle.load(f)
-
-    print(f"⏳ Building gene_counts_dict for {parquet_filename} ...")
-    gene_counts = {}
-    pq_file = pq.ParquetFile(parquet_path)
-    for batch in pq_file.iter_batches(batch_size=100000, columns=["gene_name", "read_count"]):
-        df_chunk = batch.to_pandas()
-        for _, row in df_chunk.iterrows():
-            gene = row["gene_name"]
-            count = row["read_count"]
-            gene_counts[gene] = gene_counts.get(gene, 0) + count
-
-    with open(pickle_path, "wb") as f:
-        pickle.dump(gene_counts, f)
-        print(f"Saved pickle: {pickle_path}")
-    return gene_counts
-
-def get_gene_counts_with_regions(file1, file2, cds_only=False):
-    """Get gene counts for two files with region information for colored plotting
-
-    Args:
-        file1: First parquet file name
-        file2: Second parquet file name
-        cds_only: If True, only include CDS region reads
-    """
-    print(f"🎨 Getting gene counts with region colors for {file1} vs {file2} (CDS only: {cds_only})")
-
-    # Get region-specific counts for both files
-    ribo_counts1 = get_region_gene_counts(file1, "riboseq")
-    ribo_counts2 = get_region_gene_counts(file2, "riboseq")
-
-    # Build data with region information
-    data_rows = []
-
-    for gene in set(ribo_counts1.keys()) & set(ribo_counts2.keys()):
-        regions1 = ribo_counts1[gene]
-        regions2 = ribo_counts2[gene]
-
-        # Get all regions that exist in both files for this gene
-        common_regions = set(regions1.keys()) & set(regions2.keys())
-
-        for region in common_regions:
-            # Skip non-CDS regions if CDS-only is requested
-            if cds_only and region != "CDS":
-                continue
-
-            count1 = regions1[region]
-            count2 = regions2[region]
-
-            # Map region names for consistency
-            region_name = region
-            if region == "UTR5":
-                region_name = "5UTR"
-            elif region == "UTR3":
-                region_name = "3UTR"
-
-            data_rows.append({
-                "gene_name": gene,
-                "read_count_x": count1,
-                "read_count_y": count2,
-                "region": region_name
-            })
-
-    df = pd.DataFrame(data_rows)
-
-    region_text = "CDS-only" if cds_only else "all regions"
-    print(f"🎨 Processed {len(df)} gene-region combinations for {file1} and {file2} ({region_text})")
-    return df
 
 
-def get_total_read_count(filename, file_type="riboseq"):
-    """Get total read count from a parquet file for normalization"""
-    if file_type == "riboseq":
-        file_path = os.path.join(PARQUET_FOLDER, filename)
-    else:  # mrna
-        file_path = os.path.join(MRNA_FOLDER, filename)
 
-    if not os.path.exists(file_path):
-        print(f"❌ File not found: {file_path}")
-        return 0
-
-    try:
-        # Read only the read_count column for efficiency
-        df = pq.read_table(file_path, columns=["read_count"]).to_pandas()
-        total_reads = df["read_count"].sum()
-        print(f"📊 Total reads in {filename}: {total_reads:,}")
-        return total_reads
-    except Exception as e:
-        print(f"❌ Error reading {filename}: {str(e)}")
-        return 0
 
 def get_gene_counts(file1, file2, cds_only=False, normalize_by_total=False):
     """Get gene counts for two files - OPTIMIZED with preprocessing cache
@@ -608,6 +510,7 @@ def get_gene_counts(file1, file2, cds_only=False, normalize_by_total=False):
         file2: Second parquet file name
         cds_only: If True, only include CDS region reads
     """
+    from .analysis.data_getters import get_region_gene_counts, get_cached_gene_counts
 
     if not cds_only:
         # For total counts, use the fastest available method
@@ -699,6 +602,7 @@ def get_gene_counts(file1, file2, cds_only=False, normalize_by_total=False):
     return df_merged
 
 def geneCounts(request):
+    from .analysis.data_getters import get_available_parquet_files, get_gene_counts_with_regions, get_total_read_count
     selected_genes = SelectedGene.objects.all()
     parquet_files = get_available_parquet_files()
     plot_div = None
@@ -806,6 +710,7 @@ def geneCounts(request):
 
 def log2_geneCounts(request):
     """Gene counts analysis with log2 scale on both axes"""
+    from .analysis.data_getters import get_available_parquet_files, get_gene_counts_with_regions, get_total_read_count
     selected_genes = SelectedGene.objects.all()
     parquet_files = get_available_parquet_files()
     plot_div = None
@@ -925,6 +830,7 @@ def log2_geneCounts(request):
 
 
 def plot_gene_counts(request):
+    from .analysis.data_getters import get_gene_counts_with_regions, get_gene_counts
     file1 = request.GET.get("file1")
     file2 = request.GET.get("file2")
     cds_only = request.GET.get("cds_only") == "true"
@@ -935,9 +841,17 @@ def plot_gene_counts(request):
         return JsonResponse({"error": "No files selected."})
 
     cache_key = f"gene_counts_json_{file1}_{file2}_cds_{cds_only}_regions_{show_regions}"
+
+    # 🚀 Try persistent cache first
+    cached_json = get_persistent_cache(cache_key)
+    if cached_json is not None:
+        print("⚡ Loaded plot JSON from persistent cache.")
+        return JsonResponse(cached_json, safe=False)
+
+    # Fallback to in-memory cache
     cached_json = cache.get(cache_key)
     if cached_json is not None:
-        print("Loaded plot JSON from cache.")
+        print("⚡ Loaded plot JSON from in-memory cache.")
         return JsonResponse(cached_json, safe=False)
 
     if show_regions:
@@ -1010,25 +924,12 @@ def plot_gene_counts(request):
         )
 
     fig_json = fig.to_json()
-    cache.set(cache_key, fig_json, timeout=None)
-    print("Plot Generated Successfully")
+    set_persistent_cache(cache_key, fig_json)  # 🚀 Persistent cache
+    cache.set(cache_key, fig_json, timeout=None)  # In-memory cache
+    print("Plot Generated Successfully and cached")
     return JsonResponse(fig_json, safe=False)
 
-# Function to list available Parquet files
-def get_available_parquet_files():
-    parquet_folder = "media/parquetFiles/"
-    files = [f for f in os.listdir(parquet_folder) if f.endswith(".parquet")]
-    print(f"Available Parquet Files: {files}")  # Debugging
-    return files
 
-# Function to list available mRNA Parquet files
-def get_available_mrna_files():
-    mrna_folder = "media/mrnaFiles/"
-    if not os.path.exists(mrna_folder):
-        return []
-    files = [f for f in os.listdir(mrna_folder) if f.endswith(".parquet")]
-    print(f"Available mRNA Files: {files}")  # Debugging
-    return files
 
 
 # File Paths (Adjust as Needed)
@@ -1049,19 +950,10 @@ from django.core.cache import cache
 import shutil
 
 
-def load_selected_genes():
-    selected_genes = SelectedGene.objects.values_list('gene_name', flat=True)
-    return set(selected_genes)
 
-def get_available_parquet_files():
-    parquet_files, _ = get_cached_available_files()
-    return parquet_files
-
-def get_available_mrna_parquet_files():
-    _, mrna_files = get_cached_available_files()
-    return mrna_files
 
 def get_bin_counts(selected_file):
+    from .analysis.data_getters import load_selected_genes, get_cached_region_stats
     selected_genes = load_selected_genes()
     print("🔍 Selected genes:", selected_genes)
 
@@ -1072,9 +964,16 @@ def get_bin_counts(selected_file):
     genes_key = "_".join(sorted(selected_genes))
     cache_key = f"bin_counts_{selected_file}_{genes_key}"
 
+    # 🚀 Try persistent cache first
+    cached_plots = get_persistent_cache(cache_key)
+    if cached_plots is not None:
+        print(f"⚡ Loaded bin count plots from persistent cache for {selected_file}")
+        return cached_plots, None
+
+    # Fallback to in-memory cache
     cached_plots = cache.get(cache_key)
     if cached_plots is not None:
-        print(f"Loaded bin count plots from cache for {selected_file}")
+        print(f"⚡ Loaded bin count plots from in-memory cache for {selected_file}")
         return cached_plots, None
 
     file_basename = os.path.splitext(selected_file)[0]
@@ -1181,9 +1080,10 @@ def get_bin_counts(selected_file):
         fig_combined.update_traces(marker=dict(color=combined_bin_colors[:len(average_fractions)]))
         plot_html += fig_combined.to_html(full_html=False)
 
-    # Cache the final HTML
-    cache.set(cache_key, plot_html, timeout=None)
-    print(f"Stored bin count plots in cache for {selected_file}")
+    # Cache the final HTML (both persistent and in-memory)
+    set_persistent_cache(cache_key, plot_html)  # 🚀 Persistent cache
+    cache.set(cache_key, plot_html, timeout=None)  # In-memory cache
+    print(f"Stored bin count plots in both persistent and in-memory cache for {selected_file}")
 
     return plot_html, None
 
@@ -1191,6 +1091,7 @@ def get_bin_counts(selected_file):
 
 def delta_analysis(request):
     """Delta analysis view comparing differences between replicates"""
+    from .analysis.data_getters import get_available_parquet_files, get_available_mrna_parquet_files, get_cached_plot, set_cached_plot
     ribo_files = get_available_parquet_files()
     mrna_files = get_available_mrna_parquet_files()
     plot_div = None
@@ -1223,17 +1124,22 @@ def delta_analysis(request):
 
                     # Define colors for different regions (map UTR5/UTR3 to 5UTR/3UTR)
                     region_colors = {
-                        'CDS': '#1f77b4',      # Blue
-                        'UTR5': '#ff7f0e',     # Orange
-                        '5UTR': '#ff7f0e',     # Orange (alternative name)
-                        'UTR3': '#2ca02c',     # Green
-                        '3UTR': '#2ca02c',     # Green (alternative name)
-                        'UNKNOWN': '#9467bd',  # Purple
-                        'Total': '#d62728'     # Red (fallback)
+                        'CDS': '#87CEEB',      # Light Bright Blue
+                        'UTR5': '#FF1493',     # Darker Brighter Pink
+                        '5UTR': '#FF1493',     # Darker Brighter Pink (alternative name)
+                        'UTR3': '#90EE90',     # Light Green
+                        '3UTR': '#90EE90',     # Light Green (alternative name)
+                        'UNKNOWN': '#FFD580',  # Light Orange
+                        'Total': '#87CEEB'     # Light Bright Blue (fallback)
                     }
 
+                    # Separate CDS from other regions so we can draw it on top
+                    df_cds = df[df["region"] == "CDS"]
+                    df_other = df[df["region"] != "CDS"]
+
+                    # Create figure with non-CDS regions first
                     fig = px.scatter(
-                        df,
+                        df_other,
                         x="ribo_delta",
                         y="mrna_delta",
                         color="region",
@@ -1247,6 +1153,22 @@ def delta_analysis(request):
                         },
                         color_discrete_map=region_colors
                     )
+
+                    # Add CDS points on top (drawn last = appears on top)
+                    if not df_cds.empty:
+                        fig.add_trace(
+                            px.scatter(
+                                df_cds,
+                                x="ribo_delta",
+                                y="mrna_delta",
+                                hover_name="gene_name",
+                                hover_data=["region"]
+                            ).data[0]
+                        )
+                        # Update the CDS trace with proper styling
+                        fig.data[-1].marker.color = region_colors['CDS']
+                        fig.data[-1].name = "CDS"
+                        fig.data[-1].legendgroup = "CDS"
 
                     # Add reference lines at x=0 and y=0
                     fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.7)
@@ -1282,6 +1204,7 @@ def delta_analysis(request):
 
 def combined_geneCounts(request):
     """Combined gene counts view for riboseq and mRNA files"""
+    from .analysis.data_getters import get_available_parquet_files, get_available_mrna_parquet_files
     selected_genes = SelectedGene.objects.all()
     ribo_files = get_available_parquet_files()
     mrna_files = get_available_mrna_parquet_files()
@@ -1338,6 +1261,7 @@ def combined_geneCounts(request):
 
 
 def bin_counts_view(request):
+    from .analysis.data_getters import get_available_parquet_files
     parquet_files = get_available_parquet_files()
     plots = None
     error_message = None
@@ -1375,9 +1299,16 @@ def get_read_length_distribution(selected_files):
     files_key = "_".join(sorted(selected_files))
     cache_key = f"read_length_dist_{files_key}"
 
+    # 🚀 Try persistent cache first
+    cached_plots = get_persistent_cache(cache_key)
+    if cached_plots is not None:
+        print(f"⚡ Loaded read length distribution plots from persistent cache for {files_key}")
+        return cached_plots, None
+
+    # Fallback to in-memory cache
     cached_plots = cache.get(cache_key)
     if cached_plots is not None:
-        print(f"Loaded read length distribution plots from cache for {files_key}")
+        print(f"⚡ Loaded read length distribution plots from in-memory cache for {files_key}")
         return cached_plots, None
 
     plot_html = ""
@@ -1470,9 +1401,10 @@ def get_read_length_distribution(selected_files):
         # Add combined plot at the beginning
         plot_html = fig_combined.to_html(full_html=False) + plot_html
 
-    # Cache the final HTML
-    cache.set(cache_key, plot_html, timeout=None)
-    print(f"Stored read length distribution plots in cache for {files_key}")
+    # Cache the final HTML (both persistent and in-memory)
+    set_persistent_cache(cache_key, plot_html)  # 🚀 Persistent cache
+    cache.set(cache_key, plot_html, timeout=None)  # In-memory cache
+    print(f"Stored read length distribution plots in both persistent and in-memory cache for {files_key}")
 
     return plot_html, None
 
@@ -1481,6 +1413,7 @@ def read_length_distribution_view(request):
     """
     View for read length distribution analysis.
     """
+    from .analysis.data_getters import get_available_parquet_files
     parquet_files = get_available_parquet_files()
     plots = None
     error_message = None
@@ -1510,6 +1443,8 @@ def generate_stop_codon_periodicity(selected_files):
     Generate stop codon periodicity plots WITHOUT P-site shifts.
     Uses the EXACT same logic as process_metagene_data but without applying P-site offsets.
     """
+    from .analysis.data_getters import get_cached_plot, set_cached_plot, get_cached_psite_offsets
+
     if not selected_files:
         return None, "No files selected!"
 
@@ -1645,8 +1580,8 @@ def process_metagene_data_no_shift(df, file_offsets, experiment_name, total_read
             # So the stop codon should be ~12-15 nt downstream from the raw read positions
             reference_pos = raw_reference_pos + 12  # Adjust reference to show raw offset pattern
 
-            # Look at positions from -20 to +60 relative to the adjusted reference
-            position_range = range(-20, 61)
+            # Look at positions from -10 to +30 relative to the adjusted reference
+            position_range = range(-10, 31)
 
         # Calculate relative positions - EXACT same as original
         gene_df = gene_df.copy()
@@ -1715,6 +1650,7 @@ def psite_offset_view(request):
     View for P-site offset analysis and configuration.
     Shows stop codon periodicity without P-site shifts and allows offset input.
     """
+    from .analysis.data_getters import get_available_parquet_files, get_cached_plot, set_cached_plot
     parquet_files = get_available_parquet_files()
     plot_html = None
     error_message = None
@@ -1824,6 +1760,7 @@ def stop_codon_readthrough(request):
     """Stop codon readthrough analysis separated by stop codon type (TAA/TAG/TGA)"""
     # Use new modular system
     from .analysis import stop_codon_readthrough as scr_module
+    from .analysis.data_getters import get_available_parquet_files
 
     parquet_files = get_available_parquet_files()
     plot_html = None
@@ -2148,7 +2085,18 @@ def get_cached_gene_lengths():
     """Get gene lengths from genome cache or calculate if needed"""
     # Use the new genome_cache module which handles pickle caching
     from riboApp.analysis import genome_cache
-    return genome_cache.load_gene_lengths()
+    gene_lengths_dict = genome_cache.load_gene_lengths()
+
+    if not gene_lengths_dict:
+        return pd.DataFrame()
+
+    # Convert dict to DataFrame format expected by callers
+    gene_lengths = pd.DataFrame([
+        {"gene_name": gene, "length_kb": length / 1000}
+        for gene, length in gene_lengths_dict.items()
+    ])
+
+    return gene_lengths[["gene_name", "length_kb"]]
 
 def get_cached_psite_offsets():
     """Get P-site offsets from global cache or load if needed"""
@@ -2175,29 +2123,7 @@ def get_cached_psite_offsets():
         print("⚠️ P-site offset CSV not found")
         return pd.DataFrame()
 
-def get_cached_available_files():
-    """Get available files from global cache or scan if needed"""
-    global _AVAILABLE_FILES_CACHE
 
-    current_time = time.time()
-
-    # Check if cache is valid
-    if (_AVAILABLE_FILES_CACHE['timestamp'] is not None and
-        current_time - _AVAILABLE_FILES_CACHE['timestamp'] < CACHE_TIMEOUT):
-        print("🚀 Using cached file lists")
-        return _AVAILABLE_FILES_CACHE['parquet'], _AVAILABLE_FILES_CACHE['mrna']
-
-    # Scan and cache file lists
-    print("📊 Scanning for available files...")
-    parquet_files = [f for f in os.listdir(PARQUET_FOLDER) if f.endswith(".parquet")] if os.path.exists(PARQUET_FOLDER) else []
-    mrna_files = [f for f in os.listdir(MRNA_FOLDER) if f.endswith(".parquet")] if os.path.exists(MRNA_FOLDER) else []
-
-    _AVAILABLE_FILES_CACHE['parquet'] = parquet_files
-    _AVAILABLE_FILES_CACHE['mrna'] = mrna_files
-    _AVAILABLE_FILES_CACHE['timestamp'] = current_time
-
-    print(f"💾 Cached {len(parquet_files)} parquet files and {len(mrna_files)} mRNA files")
-    return parquet_files, mrna_files
 
 def clear_global_caches():
     """Clear all global caches - call when files are uploaded/deleted"""
@@ -2375,6 +2301,7 @@ def calculate_gene_lengths(gtf_file):
 
 def process_parquet_file_gene_counts(file_path):
     """Process parquet file for gene counts - OPTIMIZED with cache"""
+    from .analysis.data_getters import get_cached_gene_counts
     filename = os.path.basename(file_path)
 
     # 🚀 Try to use cached gene counts first
@@ -2396,6 +2323,7 @@ def process_parquet_file_gene_counts(file_path):
 
 def process_mrna_file_gene_counts(file_path):
     """Process mRNA parquet file for gene counts - OPTIMIZED with cache"""
+    from .analysis.data_getters import get_cached_gene_counts
     filename = os.path.basename(file_path)
 
     # 🚀 Try to use cached gene counts first
@@ -2415,86 +2343,13 @@ def process_mrna_file_gene_counts(file_path):
     gene_counts["file_name"] = f"mRNA_{filename}"
     return gene_counts
 
-def get_mrna_gene_counts_dict(mrna_filename):
-    """Get or create gene counts dictionary for mRNA file with caching"""
-    mrna_path = os.path.join(MRNA_FOLDER, mrna_filename)
-    pickle_folder = "media/mrnaPickles/"
-    os.makedirs(pickle_folder, exist_ok=True)  # Ensure directory exists
-    pickle_path = f"{pickle_folder}{mrna_filename.replace('.parquet', '.pkl')}"
 
-    if os.path.exists(pickle_path):
-        print(f"Loading cached mRNA gene counts: {pickle_path}")
-        with open(pickle_path, "rb") as f:
-            return pickle.load(f)
 
-    if not os.path.exists(mrna_path):
-        print(f"❌ mRNA file not found: {mrna_path}")
-        # List available files for debugging
-        if os.path.exists(MRNA_FOLDER):
-            available_files = os.listdir(MRNA_FOLDER)
-            print(f"📁 Available mRNA files: {available_files}")
-        else:
-            print(f"❌ mRNA folder doesn't exist: {MRNA_FOLDER}")
-        return {}
 
-    print(f"⏳ Building gene_counts_dict for mRNA {mrna_filename} ...")
-    gene_counts = {}
-    try:
-        pq_file = pq.ParquetFile(mrna_path)
-        for batch in pq_file.iter_batches(batch_size=100000, columns=["gene_name", "read_count"]):
-            df_chunk = batch.to_pandas()
-            for _, row in df_chunk.iterrows():
-                gene = row["gene_name"]
-                count = row["read_count"]
-                gene_counts[gene] = gene_counts.get(gene, 0) + count
-
-        with open(pickle_path, "wb") as f:
-            pickle.dump(gene_counts, f)
-            print(f"Saved mRNA pickle: {pickle_path}")
-    except Exception as e:
-        print(f"❌ Error processing mRNA file {mrna_filename}: {str(e)}")
-        return {}
-
-    return gene_counts
-
-def get_region_gene_counts(filename, file_type="riboseq"):
-    """Get gene counts by region from a parquet file"""
-    if file_type == "riboseq":
-        file_path = os.path.join(PARQUET_FOLDER, filename)
-    else:  # mrna
-        file_path = os.path.join(MRNA_FOLDER, filename)
-
-    if not os.path.exists(file_path):
-        print(f"❌ File not found: {file_path}")
-        return {}
-
-    try:
-        # Read parquet file with region information
-        df = pq.read_table(file_path, columns=["gene_name", "read_count", "region"]).to_pandas()
-
-        # Group by gene and region, sum read counts
-        region_counts = df.groupby(['gene_name', 'region'])['read_count'].sum().reset_index()
-
-        # Convert to nested dictionary: {gene_name: {region: count}}
-        result = {}
-        for _, row in region_counts.iterrows():
-            gene = row['gene_name']
-            region = row['region']
-            count = row['read_count']
-
-            if gene not in result:
-                result[gene] = {}
-            result[gene][region] = count
-
-        print(f"📊 Loaded region-specific counts for {len(result)} genes from {filename}")
-        return result
-
-    except Exception as e:
-        print(f"❌ Error reading {filename}: {str(e)}")
-        return {}
 
 def get_delta_analysis_data(ribo_file1, ribo_file2, mrna_file1, mrna_file2):
     """Get delta analysis data comparing differences between replicates with region information"""
+    from .analysis.data_getters import load_or_build_gene_counts_dict, get_mrna_gene_counts_dict, get_region_gene_counts, get_cached_gene_counts
 
     # Get region-specific gene counts for all files
     ribo_counts1 = get_region_gene_counts(ribo_file1, "riboseq")
@@ -2585,6 +2440,7 @@ def get_delta_analysis_data(ribo_file1, ribo_file2, mrna_file1, mrna_file2):
 
 def get_combined_gene_counts(ribo_file, mrna_file):
     """Get combined gene counts from riboseq and mRNA files with region information"""
+    from .analysis.data_getters import load_or_build_gene_counts_dict, get_mrna_gene_counts_dict, get_region_gene_counts, get_cached_gene_counts
 
     # Get region-specific gene counts
     ribo_counts = get_region_gene_counts(ribo_file, "riboseq")
@@ -2655,6 +2511,15 @@ import hashlib
 import glob
 import os
 import plotly.io as pio
+from pathlib import Path
+from django.conf import settings
+
+# 🚀 PERSISTENT CACHE DIRECTORY FOR ANALYSIS RESULTS (lazy initialization)
+def _get_analysis_cache_dir():
+    """Get or create the analysis cache directory"""
+    cache_dir = Path(settings.MEDIA_ROOT) / ".analysis_cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
 
 
 def build_pca_cache_key():
@@ -2677,6 +2542,33 @@ def build_pca_cache_key():
 
     return f"pca_{hashed_key}"
 
+
+def get_persistent_cache(cache_key):
+    """Load analysis result from persistent pickle cache"""
+    cache_dir = _get_analysis_cache_dir()
+    cache_file = cache_dir / f"{cache_key}.pkl"
+    if cache_file.exists():
+        try:
+            with open(cache_file, 'rb') as f:
+                result = pickle.load(f)
+                print(f"⚡ Loaded {cache_key} from persistent cache")
+                return result
+        except Exception as e:
+            print(f"⚠️ Error loading persistent cache: {e}")
+    return None
+
+
+def set_persistent_cache(cache_key, data):
+    """Save analysis result to persistent pickle cache"""
+    try:
+        cache_dir = _get_analysis_cache_dir()
+        cache_file = cache_dir / f"{cache_key}.pkl"
+        with open(cache_file, 'wb') as f:
+            pickle.dump(data, f)
+            print(f"💾 Saved {cache_key} to persistent cache")
+    except Exception as e:
+        print(f"⚠️ Error saving persistent cache: {e}")
+
 def pca_gene_counts(request):
 
     if not os.path.exists(GTF_FILE):
@@ -2688,14 +2580,20 @@ def pca_gene_counts(request):
 
     print(f"Checking cache for key: {cache_key}")
 
+    # 🚀 Try persistent cache first (survives server restart)
+    cached_plot_json = get_persistent_cache(cache_key)
+    if cached_plot_json is not None:
+        print("⚡ Loaded PCA plot from persistent cache.")
+        fig = pio.from_json(cached_plot_json)
+        pca_plot_html = fig.to_html(full_html=False)
+        return render(request, "riboApp/pca_plot.html", {"pca_plot": pca_plot_html})
+
+    # Fallback to in-memory cache
     cached_plot_json = cache.get(cache_key)
     if cached_plot_json is not None:
-        print("Loaded PCA plot from cache.")
-
-        # Correctly reconstruct the figure using plotly.io.from_json()
-        fig = pio.from_json(cached_plot_json)  # 🔄 Fixed JSON deserialization
-        pca_plot_html = fig.to_html(full_html=False)  # Ensure HTML rendering
-
+        print("⚡ Loaded PCA plot from in-memory cache.")
+        fig = pio.from_json(cached_plot_json)
+        pca_plot_html = fig.to_html(full_html=False)
         return render(request, "riboApp/pca_plot.html", {"pca_plot": pca_plot_html})
 
     # Now, recompute the PCA plot (fig is defined here)
@@ -2773,11 +2671,11 @@ def pca_gene_counts(request):
     )
     pca_plot_html = fig.to_html(full_html=False)
 
-    # Cache the result indefinitely (or set a timeout if you prefer)
-    # ✅ Store PCA plot as JSON before caching
-    pca_plot_json = fig.to_json()  # 🔄 Corrected storage format
-    cache.set(cache_key, pca_plot_json, timeout=None)
-    print("Stored PCA plot in cache.")
+    # Cache the result (both persistent and in-memory)
+    pca_plot_json = fig.to_json()
+    set_persistent_cache(cache_key, pca_plot_json)  # 🚀 Persistent cache
+    cache.set(cache_key, pca_plot_json, timeout=None)  # In-memory cache
+    print("Stored PCA plot in both persistent and in-memory cache.")
     return render(request, "riboApp/pca_plot.html", {"pca_plot": pca_plot_html})
 
 def combined_pca_gene_counts(request):
@@ -2804,9 +2702,18 @@ def combined_pca_gene_counts(request):
     hashed_key = hashlib.md5(cache_key.encode()).hexdigest()
     cache_key = f"combined_pca_{hashed_key}"
 
+    # 🚀 Try persistent cache first (survives server restart)
+    cached_plot_json = get_persistent_cache(cache_key)
+    if cached_plot_json is not None:
+        print("⚡ Loaded combined PCA plot from persistent cache.")
+        fig = pio.from_json(cached_plot_json)
+        pca_plot_html = fig.to_html(full_html=False)
+        return render(request, "riboApp/combinedPca.html", {"pca_plot": pca_plot_html})
+
+    # Fallback to in-memory cache
     cached_plot_json = cache.get(cache_key)
     if cached_plot_json is not None:
-        print("Loaded combined PCA plot from cache.")
+        print("⚡ Loaded combined PCA plot from in-memory cache.")
         fig = pio.from_json(cached_plot_json)
         pca_plot_html = fig.to_html(full_html=False)
         return render(request, "riboApp/combinedPca.html", {"pca_plot": pca_plot_html})
@@ -2887,10 +2794,11 @@ def combined_pca_gene_counts(request):
     )
     pca_plot_html = fig.to_html(full_html=False)
 
-    # Cache the result
+    # Cache the result (both persistent and in-memory)
     pca_plot_json = fig.to_json()
-    cache.set(cache_key, pca_plot_json, timeout=None)
-    print("Stored combined PCA plot in cache.")
+    set_persistent_cache(cache_key, pca_plot_json)  # 🚀 Persistent cache
+    cache.set(cache_key, pca_plot_json, timeout=None)  # In-memory cache
+    print("Stored combined PCA plot in both persistent and in-memory cache.")
 
     return render(request, "riboApp/combinedPca.html", {"pca_plot": pca_plot_html})
 
@@ -3084,8 +2992,19 @@ def process_ribo_files(request):
 
     return render(request, "riboApp/coverageGraphs.html", {"start_plot": start_plot_path, "stop_plot": stop_plot_path})
 
+def _generate_metagene_cache_key(selected_files, selected_genes=None):
+    """Generate a cache key for metagene plots based on selected files and genes"""
+    import hashlib
+    files_str = "_".join(sorted(selected_files))
+    genes_str = "_".join(sorted(selected_genes)) if selected_genes else "all_genes"
+    combined = f"{files_str}_{genes_str}"
+    cache_hash = hashlib.md5(combined.encode()).hexdigest()
+    return f"psite_metagene_{cache_hash}"
+
+
 def psite_metagene_plots(request):
     """Generate P-site offset metagene plots for parquet files"""
+    from .analysis.data_getters import get_available_parquet_files, load_selected_genes
     parquet_files = get_available_parquet_files()
     selected_genes = load_selected_genes()
     start_plot = None
@@ -3102,9 +3021,20 @@ def psite_metagene_plots(request):
             error_message = "No genes selected. Please select genes first or uncheck 'Use Selected Genes Only'."
         else:
             try:
-                # Generate metagene plots
+                # 🚀 Check persistent cache first
                 genes_to_use = selected_genes if use_selected_genes else None
-                start_plot, stop_plot = generate_psite_metagene_plots(selected_files, genes_to_use)
+                cache_key = _generate_metagene_cache_key(selected_files, genes_to_use)
+
+                cached_plots = get_persistent_cache(cache_key)
+                if cached_plots is not None:
+                    print(f"⚡ Loaded metagene plots from persistent cache")
+                    start_plot, stop_plot = cached_plots
+                else:
+                    # Generate metagene plots
+                    start_plot, stop_plot = generate_psite_metagene_plots(selected_files, genes_to_use)
+                    # 💾 Save to persistent cache
+                    set_persistent_cache(cache_key, (start_plot, stop_plot))
+                    print(f"💾 Saved metagene plots to persistent cache")
             except Exception as e:
                 error_message = f"Error generating plots: {str(e)}"
 
@@ -3121,6 +3051,7 @@ def psite_metagene_plots(request):
 
 def generate_psite_metagene_plots(selected_files, selected_genes=None):
     """Generate start and stop codon metagene plots with P-site offsets"""
+    from .analysis.data_getters import get_cached_psite_data, get_cached_file_metadata
 
     # Load P-site offsets
     if not os.path.exists(OFFSET_CSV):
@@ -3143,28 +3074,35 @@ def generate_psite_metagene_plots(selected_files, selected_genes=None):
             print(f"Warning: No P-site offsets found for {file_basename}")
             continue
 
-        # Read parquet file
-        df = pq.read_table(file_path, columns=[
-            "gene_name", "start_position", "end_position", "read_length", "read_count", "region"
-        ]).to_pandas()
+        # 🚀 Try to use cached P-site data first (much faster!)
+        df = get_cached_psite_data(file)
 
-        # Filter for CDS regions only (where ribosomes should be)
-        df = df[df["region"] == "CDS"]
+        if df.empty:
+            print(f"⚠️ P-site cache miss for {file}, reading parquet file...")
+            # Fallback: Read parquet file
+            df = pq.read_table(file_path, columns=[
+                "gene_name", "start_position", "end_position", "read_length", "read_count", "region"
+            ]).to_pandas()
+
+            # Filter for CDS regions only (where ribosomes should be)
+            df = df[df["region"] == "CDS"]
+        else:
+            print(f"⚡ Using cached P-site data for {file}")
 
         if df.empty:
             print(f"Warning: No CDS data found in {file}")
             continue
 
-        # Calculate total reads for normalization
-        total_reads = df["read_count"].sum()
+        # Get total reads from metadata cache if available
+        metadata = get_cached_file_metadata(file)
+        total_reads = metadata.get('total_reads', df["read_count"].sum())
 
-        # Process start codon data (positions around start codon)
-        start_data = process_metagene_data(df, file_offsets, file_basename, total_reads, "start", selected_genes)
+        # 🚀 OPTIMIZATION: Process BOTH start and stop in a single pass through the data
+        # This avoids processing the same dataframe twice
+        start_data, stop_data = process_metagene_data_both_sites(df, file_offsets, file_basename, total_reads, selected_genes)
+
         if not start_data.empty:
             all_start_data.append(start_data)
-
-        # Process stop codon data (positions around stop codon)
-        stop_data = process_metagene_data(df, file_offsets, file_basename, total_reads, "stop", selected_genes)
         if not stop_data.empty:
             all_stop_data.append(stop_data)
 
@@ -3196,8 +3134,96 @@ def generate_psite_metagene_plots(selected_files, selected_genes=None):
 
     return start_plot_html, stop_plot_html
 
+def process_metagene_data_both_sites(df, file_offsets, experiment_name, total_reads, selected_genes=None):
+    """Process BOTH start and stop codon data in a single pass - OPTIMIZED
+
+    This is much faster than calling process_metagene_data twice because we only
+    process the dataframe once instead of twice.
+    """
+
+    # Filter by selected genes if provided
+    if selected_genes:
+        df = df[df["gene_name"].isin(selected_genes)]
+        if df.empty:
+            return pd.DataFrame(), pd.DataFrame()
+
+    # Create offset mapping
+    length_to_offset = dict(zip(file_offsets["read_length"], file_offsets["P_site_offset"]))
+
+    # Filter for read lengths 28-32 (typical ribosome footprint sizes)
+    df_filtered = df[df["read_length"].between(28, 32)].copy()
+
+    if df_filtered.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    # Apply P-site offsets
+    df_filtered["offset"] = df_filtered["read_length"].map(length_to_offset)
+    df_filtered = df_filtered.dropna(subset=["offset"])
+    df_filtered["p_site"] = df_filtered["start_position"] + df_filtered["offset"].astype(int)
+
+    # Pre-calculate reference positions for all genes at once
+    start_reference_positions = df_filtered.groupby("gene_name")["p_site"].min()
+    # For stop codon: use 95th percentile of P-site positions (where stop codon is likely located)
+    stop_reference_positions = df_filtered.groupby("gene_name")["p_site"].quantile(0.95)
+
+    # Filter genes with at least 10 reads
+    gene_read_counts = df_filtered.groupby("gene_name").size()
+    valid_genes = gene_read_counts[gene_read_counts >= 10].index
+
+    df_filtered = df_filtered[df_filtered["gene_name"].isin(valid_genes)].copy()
+    start_reference_positions = start_reference_positions[valid_genes]
+    stop_reference_positions = stop_reference_positions[valid_genes]
+
+    if df_filtered.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    # 🚀 PROCESS START CODON DATA
+    start_position_range = range(-30, 63)
+    df_start = df_filtered.copy()
+    df_start["relative_position"] = df_start.apply(
+        lambda row: row["p_site"] - start_reference_positions[row["gene_name"]], axis=1
+    )
+    df_start = df_start[df_start["relative_position"].isin(start_position_range)]
+    start_position_counts = df_start.groupby("relative_position")["read_count"].sum()
+
+    start_metagene_data = []
+    for pos, count in start_position_counts.items():
+        if count > 0:
+            start_metagene_data.append({
+                "experiment": experiment_name,
+                "shifted_position": pos,
+                "avg_count": (count / total_reads) * 1e6,  # Normalize to RPM
+            })
+
+    start_metagene_df = pd.DataFrame(start_metagene_data) if start_metagene_data else pd.DataFrame()
+
+    # 🚀 PROCESS STOP CODON DATA
+    stop_position_range = range(-10, 31)
+    df_stop = df_filtered.copy()
+    # For stop codon: calculate relative position as (stop_position - p_site)
+    # This gives negative values upstream and positive values downstream of stop
+    df_stop["relative_position"] = df_stop.apply(
+        lambda row: stop_reference_positions[row["gene_name"]] - row["p_site"], axis=1
+    )
+    df_stop = df_stop[df_stop["relative_position"].isin(stop_position_range)]
+    stop_position_counts = df_stop.groupby("relative_position")["read_count"].sum()
+
+    stop_metagene_data = []
+    for pos, count in stop_position_counts.items():
+        if count > 0:
+            stop_metagene_data.append({
+                "experiment": experiment_name,
+                "shifted_position": pos,
+                "avg_count": (count / total_reads) * 1e6,  # Normalize to RPM
+            })
+
+    stop_metagene_df = pd.DataFrame(stop_metagene_data) if stop_metagene_data else pd.DataFrame()
+
+    return start_metagene_df, stop_metagene_df
+
+
 def process_metagene_data(df, file_offsets, experiment_name, total_reads, site_type, selected_genes=None):
-    """Process parquet data to create metagene coverage around start/stop codons
+    """Process parquet data to create metagene coverage around start/stop codons - OPTIMIZED
 
     Note: Parquet files use transcript coordinates (not genomic coordinates).
     For stop codon analysis, we find the CDS end boundary for each gene.
@@ -3208,18 +3234,6 @@ def process_metagene_data(df, file_offsets, experiment_name, total_reads, site_t
         df = df[df["gene_name"].isin(selected_genes)]
         if df.empty:
             return pd.DataFrame()
-
-    # For stop codon analysis, we need to find the CDS end position for each gene
-    # Do this BEFORE filtering to CDS only
-    cds_end_positions = {}
-    if site_type == "stop":
-        for gene_name in df["gene_name"].unique():
-            gene_data = df[df["gene_name"] == gene_name]
-            cds_data = gene_data[gene_data["region"] == "CDS"]
-            if not cds_data.empty:
-                # The stop codon is at the end of the CDS region
-                # Use the maximum end_position in the CDS as the stop codon position
-                cds_end_positions[gene_name] = cds_data["end_position"].max()
 
     # Create offset mapping
     length_to_offset = dict(zip(file_offsets["read_length"], file_offsets["P_site_offset"]))
@@ -3235,80 +3249,67 @@ def process_metagene_data(df, file_offsets, experiment_name, total_reads, site_t
     df_filtered = df_filtered.dropna(subset=["offset"])
     df_filtered["p_site"] = df_filtered["start_position"] + df_filtered["offset"].astype(int)
 
-    # For start codon analysis, we want positions relative to start codon (position 0)
-    # For stop codon analysis, we want positions relative to stop codon
-    # Since we don't have explicit start/stop codon positions, we'll use gene boundaries
-    # and assume start codon is at the beginning of CDS and stop codon at the end
+    # 🚀 MAJOR OPTIMIZATION: Pre-calculate reference positions for all genes at once
+    if site_type == "start":
+        # For start codon: use minimum P-site position per gene
+        reference_positions = df_filtered.groupby("gene_name")["p_site"].min()
+        position_range = range(-30, 63)
+    else:  # stop
+        # For stop codon: use 95th percentile of P-site positions per gene
+        # This represents where the stop codon is likely located
+        reference_positions = df_filtered.groupby("gene_name")["p_site"].quantile(0.95)
+        position_range = range(-10, 31)
 
+    # Filter genes with at least 10 reads
+    gene_read_counts = df_filtered.groupby("gene_name").size()
+    valid_genes = gene_read_counts[gene_read_counts >= 10].index
+
+    df_filtered = df_filtered[df_filtered["gene_name"].isin(valid_genes)].copy()
+    reference_positions = reference_positions[valid_genes]
+
+    if df_filtered.empty:
+        return pd.DataFrame()
+
+    # 🚀 VECTORIZED: Calculate relative positions for ALL genes at once
+    if site_type == "start":
+        # For start codon: p_site - start_position (positive downstream)
+        df_filtered["relative_position"] = df_filtered.apply(
+            lambda row: row["p_site"] - reference_positions[row["gene_name"]], axis=1
+        )
+    else:  # stop
+        # For stop codon: stop_position - p_site (positive upstream, negative downstream)
+        df_filtered["relative_position"] = df_filtered.apply(
+            lambda row: reference_positions[row["gene_name"]] - row["p_site"], axis=1
+        )
+
+    # 🚀 VECTORIZED: Filter to position range and aggregate in one step
+    df_filtered = df_filtered[df_filtered["relative_position"].isin(position_range)]
+
+    # Aggregate by position across all genes
+    position_counts = df_filtered.groupby("relative_position")["read_count"].sum()
+
+    # Convert to metagene format
     metagene_data = []
-
-    total_genes = df_filtered["gene_name"].nunique()
-    genes_processed = 0
-    genes_skipped = 0
-
-    # Group by gene to get start/stop positions
-    for gene_name, gene_df in df_filtered.groupby("gene_name"):
-        if len(gene_df) < 10:  # Skip genes with too few reads
-            genes_skipped += 1
-            continue
-        genes_processed += 1
-
-        if site_type == "start":
-            # Use the minimum P-site position as the start codon reference
-            reference_pos = gene_df["p_site"].min()
-            # Look at positions from -30 to +62 relative to start
-            position_range = range(-30, 63)
-        else:  # stop
-            # For stop codon in transcript coordinates:
-            # The parquet files use transcript coordinates (not genomic)
-            # The stop codon is at the END of the CDS region
-            # Use the pre-calculated CDS end position for this gene
-            if gene_name in cds_end_positions:
-                reference_pos = cds_end_positions[gene_name]
-            else:
-                # Fallback: use max p_site in CDS region
-                cds_reads = gene_df[gene_df["region"] == "CDS"]
-                if not cds_reads.empty:
-                    reference_pos = cds_reads["end_position"].max()
-                else:
-                    reference_pos = gene_df["p_site"].max()
-
-            # Look at positions from -60 to +30 relative to stop codon
-            # Negative positions = upstream of stop (in CDS)
-            # Positive positions = downstream of stop (readthrough into UTR3)
-            position_range = range(-60, 31)
-
-        # Calculate relative positions
-        gene_df = gene_df.copy()
-        gene_df["relative_position"] = gene_df["p_site"] - reference_pos
-
-
-        # Aggregate counts for each relative position
-        for pos in position_range:
-            pos_data = gene_df[gene_df["relative_position"] == pos]
-            count = pos_data["read_count"].sum()
-
-            if count > 0:  # Only include positions with reads
-                metagene_data.append({
-                    "experiment": experiment_name,
-                    "shifted_position": pos,
-                    "avg_count": (count / total_reads) * 1e6,  # Normalize to RPM
-                    "gene_name": gene_name
-                })
+    for pos, count in position_counts.items():
+        if count > 0:
+            metagene_data.append({
+                "experiment": experiment_name,
+                "shifted_position": pos,
+                "avg_count": (count / total_reads) * 1e6,  # Normalize to RPM
+            })
 
     if not metagene_data:
         return pd.DataFrame()
 
-    # Convert to DataFrame and aggregate across genes for each experiment
+    # Convert to DataFrame
     metagene_df = pd.DataFrame(metagene_data)
 
     # DEBUG: Print sample of metagene data before aggregation
     print(f"\n🔍 DEBUG process_metagene_data - site_type={site_type}, experiment={experiment_name}")
-    print(f"  Total genes in input: {total_genes}")
-    print(f"  Genes processed: {genes_processed}")
-    print(f"  Genes skipped (< 10 reads): {genes_skipped}")
+    print(f"  Total genes processed: {len(valid_genes)}")
     print(f"  Total data points: {len(metagene_df)}")
-    print(f"  Position range: {metagene_df['shifted_position'].min()} to {metagene_df['shifted_position'].max()}")
+    if not metagene_df.empty:
+        print(f"  Position range: {metagene_df['shifted_position'].min()} to {metagene_df['shifted_position'].max()}")
 
     if selected_genes:
         # When using selected genes, combine all genes into a single line per experiment
@@ -3563,6 +3564,8 @@ def download_combined_pca_csv(request):
 
 def download_psite_metagene_csv(request, plot_type):
     """Download CSV for P-site metagene plots"""
+    from .analysis.data_getters import get_cached_psite_data, get_cached_file_metadata
+
     selected_files = request.GET.getlist("selected_files")
     use_selected_genes = request.GET.get("use_selected_genes") == "true"
 
@@ -3603,8 +3606,18 @@ def download_psite_metagene_csv(request, plot_type):
             if file_offsets.empty:
                 continue
 
-            df = pq.read_table(file_path).to_pandas()
-            total_reads = df["read_count"].sum()
+            # 🚀 Try to use cached P-site data first
+            df = get_cached_psite_data(selected_file)
+
+            if df.empty:
+                print(f"⚠️ P-site cache miss for CSV export, reading parquet file...")
+                df = pq.read_table(file_path).to_pandas()
+            else:
+                print(f"⚡ Using cached P-site data for CSV export: {selected_file}")
+
+            # Get total reads from metadata cache if available
+            metadata = get_cached_file_metadata(selected_file)
+            total_reads = metadata.get('total_reads', df["read_count"].sum())
 
             # Process start codon data
             start_data = process_metagene_data(df, file_offsets, experiment_name, total_reads, "start", selected_genes)
@@ -3720,11 +3733,16 @@ def create_file_preprocessing_cache(file_path, file_type="riboseq"):
         # Cache 1: Basic gene counts (most common operation)
         gene_counts = df.groupby("gene_name")["read_count"].sum().reset_index()
         gene_counts.columns = ["gene_name", "total_count"]
-        cache.set(f"{cache_key_base}_gene_counts", gene_counts.to_dict('records'), timeout=None)
+        gene_counts_data = gene_counts.to_dict('records')
+        from riboApp.analysis.data_getters import _save_persistent_cache
+        _save_persistent_cache(f"{cache_key_base}_gene_counts", gene_counts_data)  # 🚀 Persistent
+        cache.set(f"{cache_key_base}_gene_counts", gene_counts_data, timeout=None)
 
         # Cache 2: Read length distribution
         read_length_dist = df.groupby("read_length")["read_count"].sum().reset_index()
-        cache.set(f"{cache_key_base}_read_length", read_length_dist.to_dict('records'), timeout=None)
+        read_length_data = read_length_dist.to_dict('records')
+        _save_persistent_cache(f"{cache_key_base}_read_length", read_length_data)  # 🚀 Persistent
+        cache.set(f"{cache_key_base}_read_length", read_length_data, timeout=None)
 
         # Cache 3: Region-based statistics
         if 'region' in df.columns:
@@ -3732,14 +3750,18 @@ def create_file_preprocessing_cache(file_path, file_type="riboseq"):
                 'read_count': ['sum', 'mean', 'count']
             }).reset_index()
             region_stats.columns = ['region', 'read_length', 'total_reads', 'mean_reads', 'num_positions']
-            cache.set(f"{cache_key_base}_region_stats", region_stats.to_dict('records'), timeout=None)
+            region_stats_data = region_stats.to_dict('records')
+            _save_persistent_cache(f"{cache_key_base}_region_stats", region_stats_data)  # 🚀 Persistent
+            cache.set(f"{cache_key_base}_region_stats", region_stats_data, timeout=None)
 
             # Cache 3b: CDS-only gene counts (for fast CDS-only analysis)
             cds_df = df[df['region'] == 'CDS']
             if not cds_df.empty:
                 cds_gene_counts = cds_df.groupby("gene_name")["read_count"].sum().reset_index()
                 cds_gene_counts.columns = ["gene_name", "cds_count"]
-                cache.set(f"{cache_key_base}_cds_gene_counts", cds_gene_counts.to_dict('records'), timeout=None)
+                cds_data = cds_gene_counts.to_dict('records')
+                _save_persistent_cache(f"{cache_key_base}_cds_gene_counts", cds_data)  # 🚀 Persistent
+                cache.set(f"{cache_key_base}_cds_gene_counts", cds_data, timeout=None)
                 print(f"Cached CDS-only gene counts for {len(cds_gene_counts)} genes")
 
         # Cache 4: For riboseq files - P-site ready data
@@ -3754,6 +3776,7 @@ def create_file_preprocessing_cache(file_path, file_type="riboseq"):
             if not cds_df.empty:
                 # Only cache the columns we need
                 cds_cache_data = cds_df[required_cols].to_dict('records')
+                _save_persistent_cache(f"{cache_key_base}_cds_data", cds_cache_data)  # 🚀 Persistent
                 cache.set(f"{cache_key_base}_cds_data", cds_cache_data, timeout=None)
 
                 # Cache 4b: Pre-calculate metagene data if P-site offsets are available
@@ -3772,7 +3795,9 @@ def create_file_preprocessing_cache(file_path, file_type="riboseq"):
                             cds_df["p_site"] = cds_df["start_position"] + cds_df["offset"].astype(int)
 
                             # Cache the P-site enhanced data
-                            cache.set(f"{cache_key_base}_psite_data", cds_df.to_dict('records'), timeout=None)
+                            psite_data = cds_df.to_dict('records')
+                            _save_persistent_cache(f"{cache_key_base}_psite_data", psite_data)  # 🚀 Persistent
+                            cache.set(f"{cache_key_base}_psite_data", psite_data, timeout=None)
                             print(f"📍 Pre-calculated P-site data for {filename}")
                 except Exception as e:
                     print(f"⚠️ Could not pre-calculate P-site data for {filename}: {str(e)}")
@@ -3786,6 +3811,7 @@ def create_file_preprocessing_cache(file_path, file_type="riboseq"):
             'regions': list(df['region'].unique()) if 'region' in df.columns else [],
             'cached_at': time.time()
         }
+        _save_persistent_cache(f"{cache_key_base}_metadata", file_metadata)  # 🚀 Persistent
         cache.set(f"{cache_key_base}_metadata", file_metadata, timeout=None)
 
         processing_time = time.time() - start_time
@@ -3798,96 +3824,10 @@ def create_file_preprocessing_cache(file_path, file_type="riboseq"):
         return False
 
 
-def get_cached_gene_counts(filename, file_type="riboseq", cds_only=False):
-    """Fast retrieval of gene counts from cache"""
-    if cds_only:
-        cache_key = f"preprocess_{file_type}_{filename}_cds_gene_counts"
-        count_column = "cds_count"
-    else:
-        cache_key = f"preprocess_{file_type}_{filename}_gene_counts"
-        count_column = "total_count"
-
-    cached_data = cache.get(cache_key)
-
-    if cached_data:
-        df = pd.DataFrame(cached_data)
-        # Rename the count column to total_count for compatibility
-        if count_column != "total_count" and count_column in df.columns:
-            df = df.rename(columns={count_column: "total_count"})
-        return df
-
-    # For CDS-only, try to create cache if it doesn't exist
-    if cds_only:
-        print(f"Cache miss for {filename} (CDS: {cds_only}), reading from file...")
-        file_path = os.path.join(PARQUET_FOLDER if file_type == "riboseq" else MRNA_FOLDER, filename)
-        if os.path.exists(file_path):
-            create_file_preprocessing_cache(file_path, file_type)
-            cached_data = cache.get(cache_key)
-            if cached_data:
-                df = pd.DataFrame(cached_data)
-                # Rename the count column to total_count for compatibility
-                if count_column != "total_count" and count_column in df.columns:
-                    df = df.rename(columns={count_column: "total_count"})
-                return df
-
-    # For total counts, don't try to create cache here - let the calling function handle fallback
-    return pd.DataFrame()
 
 
-def get_cached_file_metadata(filename, file_type="riboseq"):
-    """Get file metadata from cache"""
-    cache_key = f"preprocess_{file_type}_{filename}_metadata"
-    return cache.get(cache_key, {})
 
 
-def get_cached_read_length_data(filename, file_type="riboseq"):
-    """Fast retrieval of read length distribution from cache"""
-    cache_key = f"preprocess_{file_type}_{filename}_read_length"
-    cached_data = cache.get(cache_key)
-
-    if cached_data:
-        return pd.DataFrame(cached_data)
-    return pd.DataFrame()
-
-
-def get_cached_cds_data(filename):
-    """Fast retrieval of CDS data for metagene analysis"""
-    cache_key = f"preprocess_riboseq_{filename}_cds_data"
-    cached_data = cache.get(cache_key)
-
-    if cached_data:
-        return pd.DataFrame(cached_data)
-    return pd.DataFrame()
-
-
-def get_cached_region_stats(filename, file_type="riboseq"):
-    """Fast retrieval of region statistics from cache"""
-    cache_key = f"preprocess_{file_type}_{filename}_region_stats"
-    cached_data = cache.get(cache_key)
-
-    if cached_data:
-        return pd.DataFrame(cached_data)
-    return pd.DataFrame()
-
-
-def get_cached_psite_data(filename):
-    """Fast retrieval of P-site enhanced data for metagene analysis"""
-    cache_key = f"preprocess_riboseq_{filename}_psite_data"
-    cached_data = cache.get(cache_key)
-
-    if cached_data:
-        return pd.DataFrame(cached_data)
-    return pd.DataFrame()
-
-
-def get_cached_plot(cache_key):
-    """Get cached plot HTML"""
-    return cache.get(cache_key)
-
-
-def set_cached_plot(cache_key, plot_html, timeout=3600):
-    """Cache plot HTML for 1 hour by default"""
-    cache.set(cache_key, plot_html, timeout)
 
 
 def preprocess_all_uploaded_files():
@@ -3914,6 +3854,7 @@ def preprocess_all_uploaded_files():
 
 def update_psite_caches():
     """Update existing caches with P-site enhanced data"""
+    from .analysis.data_getters import get_cached_psite_data
     print("🔄 Updating P-site caches for existing files...")
 
     ribo_files = glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet"))
@@ -3987,6 +3928,19 @@ def update_psite_caches_view(request):
             messages.error(request, f"Error updating P-site caches: {str(e)}")
 
     return redirect('upload_parquet')
+
+
+def clear_delta_analysis_cache_view(request):
+    """View to clear delta analysis cached plots only"""
+    if request.method == "POST":
+        try:
+            from .analysis.data_getters import clear_delta_analysis_cache
+            clear_delta_analysis_cache()
+            messages.success(request, "Delta analysis cache has been cleared.")
+        except Exception as e:
+            messages.error(request, f"Error clearing delta analysis cache: {str(e)}")
+
+    return redirect('delta_analysis')
 
 
 def clear_all_cache_view(request):

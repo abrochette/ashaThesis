@@ -9,10 +9,48 @@
             A powerful web application for processing, analyzing, and visualizing ribosome profiling (Ribo-seq) data.
             From raw FASTQ files to publication-ready plots, RiboApp streamlines your ribosome profiling workflow.
         </p>
+        <div class="hero-buttons">
+            <a href="/upload/" class="hero-button primary">Get Started</a>
+            <a href="#workflow" class="hero-button secondary">Learn More</a>
+        </div>
     </div>
 </div>
 
-<div class="features-section">
+<!-- Workflow Flow Diagram -->
+<div style="background: white; padding: 50px 20px; margin: 0 -20px 100px -20px;">
+    <h2 class="section-title">Analysis Pipeline</h2>
+    <div style="display: flex; align-items: center; justify-content: center; gap: 0; flex-wrap: nowrap; max-width: 1400px; margin: 0 auto; padding: 20px 10px; overflow-x: auto;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #5568d3 100%); border-radius: 15px; padding: 25px 20px; text-align: center; min-width: 140px; flex-shrink: 0; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12); color: white;">
+            <h3 style="font-weight: 800; font-size: 1.1rem; margin-bottom: 8px; color: white;">Raw Data</h3>
+            <p style="font-size: 0.8rem; margin-bottom: 12px; color: white;">FASTQ Files</p>
+        </div>
+        <div style="font-size: 2rem; color: #667eea; font-weight: bold; min-width: 40px; text-align: center; flex-shrink: 0;">→</div>
+        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 15px; padding: 25px 20px; text-align: center; min-width: 140px; flex-shrink: 0; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12); color: white;">
+            <h3 style="font-weight: 800; font-size: 1.1rem; margin-bottom: 8px; color: white;">Preprocessing</h3>
+            <p style="font-size: 0.8rem; margin-bottom: 12px; color: white;">Riboflow Scripts</p>
+        </div>
+        <div style="font-size: 2rem; color: #667eea; font-weight: bold; min-width: 40px; text-align: center; flex-shrink: 0;">→</div>
+        <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 15px; padding: 25px 20px; text-align: center; min-width: 140px; flex-shrink: 0; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12); color: white;">
+            <h3 style="font-weight: 800; font-size: 1.1rem; margin-bottom: 8px; color: white;">Upload</h3>
+            <p style="font-size: 0.8rem; margin-bottom: 12px; color: white;">Parquet Files</p>
+        </div>
+        <div style="font-size: 2rem; color: #667eea; font-weight: bold; min-width: 40px; text-align: center; flex-shrink: 0;">→</div>
+        <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); border-radius: 15px; padding: 25px 20px; text-align: center; min-width: 140px; flex-shrink: 0; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12); color: white;">
+            <h3 style="font-weight: 800; font-size: 1.1rem; margin-bottom: 8px; color: white;">P-site Adjustment</h3>
+            <p style="font-size: 0.8rem; margin-bottom: 12px; color: white;">Offset Determination</p>
+        </div>
+        <div style="font-size: 2rem; color: #667eea; font-weight: bold; min-width: 40px; text-align: center; flex-shrink: 0;">→</div>
+        <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); border-radius: 15px; padding: 25px 20px; text-align: center; min-width: 140px; flex-shrink: 0; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12); color: white;">
+            <h3 style="font-weight: 800; font-size: 1.1rem; margin-bottom: 8px; color: white;">Analysis</h3>
+            <p style="font-size: 0.8rem; margin-bottom: 12px; color: white;">Visualizations</p>
+        </div>
+    </div>
+    <div style="text-align: center; margin-top: 20px; font-size: 1.2rem; color: #666;">
+        BANANA
+    </div>
+</div>
+
+<div class="features-section" id="features">
     <h2 class="section-title">Key Features</h2>
     <div class="features-grid">
         <div class="feature-card">
@@ -34,7 +72,7 @@
     </div>
 </div>
 
-<div class="workflow-section">
+<div class="workflow-section" id="workflow">
     <h2 class="section-title">Analysis Workflow</h2>
     <div class="workflow-steps">
         <div class="workflow-step">
@@ -42,7 +80,7 @@
             <div class="step-content">
                 <h3>Pre-Process</h3>
                 <p>Generate riboflow scripts for processing raw FASTQ files into analysis-ready parquet format</p>
-                <a href="/preprocess/" class="step-button">Start Processing →</a>
+                <a href="/preprocess/" class="step-button">Start Processing</a>
             </div>
         </div>
 
@@ -53,7 +91,7 @@
             <div class="step-content">
                 <h3>Upload & Analyze</h3>
                 <p>Upload your processed parquet files and start analyzing your data</p>
-                <a href="/upload/" class="step-button">Start Analysis →</a>
+                <a href="/upload/" class="step-button">Start Analysis</a>
             </div>
         </div>
 
@@ -64,7 +102,7 @@
             <div class="step-content">
                 <h3>Quality Control</h3>
                 <p>Determine P-site offsets and validate data quality with periodicity analysis</p>
-                <a href="/psiteOffset/" class="step-button">Check P-sites →</a>
+                <a href="/psiteOffset/" class="step-button">Check P-sites</a>
             </div>
         </div>
 
@@ -75,7 +113,7 @@
             <div class="step-content">
                 <h3>Advanced Analysis</h3>
                 <p>Explore your data with comprehensive analysis tools and interactive visualizations</p>
-                <a href="/upload/" class="step-button">Continue Analysis →</a>
+                <a href="/upload/" class="step-button">Continue Analysis</a>
             </div>
         </div>
     </div>
@@ -96,6 +134,12 @@
         <a href="/readLengthDistribution/" class="quick-link">
             <div class="quick-link-text">Read Lengths</div>
         </a>
+        <a href="/deltaAnalysis/" class="quick-link">
+            <div class="quick-link-text">Delta Analysis</div>
+        </a>
+        <a href="/upload/" class="quick-link">
+            <div class="quick-link-text">All Tools</div>
+        </a>
     </div>
 </div>
 
@@ -106,16 +150,34 @@
     .hero-section {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        padding: 60px 0;
+        padding: 80px 0;
         margin: -20px -20px 40px -20px;
         text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .hero-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 80%, rgba(255,255,255,0.1) 0%, transparent 50%);
+        pointer-events: none;
     }
 
     .hero-content {
         max-width: 800px;
         margin: 0 auto;
         padding: 0 20px;
+        position: relative;
+        z-index: 1;
     }
+
+
 
     .hero-title {
         font-size: 3.5rem;
@@ -127,24 +189,245 @@
     .hero-subtitle {
         font-size: 1.5rem;
         margin-bottom: 20px;
-        opacity: 0.9;
+        opacity: 0.95;
+        font-weight: 500;
     }
 
     .hero-description {
         font-size: 1.1rem;
         line-height: 1.6;
-        opacity: 0.8;
+        opacity: 0.85;
         max-width: 600px;
-        margin: 0 auto;
+        margin: 0 auto 30px;
+    }
+
+    .hero-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .hero-button {
+        padding: 12px 30px;
+        border-radius: 50px;
+        text-decoration: none;
+        font-weight: bold;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        display: inline-block;
+    }
+
+    .hero-button.primary {
+        background: white;
+        color: #667eea;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+
+    .hero-button.primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        color: #667eea;
+        text-decoration: none;
+    }
+
+    .hero-button.secondary {
+        background: rgba(255,255,255,0.2);
+        color: white;
+        border: 2px solid white;
+    }
+
+    .hero-button.secondary:hover {
+        background: rgba(255,255,255,0.3);
+        color: white;
+        text-decoration: none;
     }
 
     /* Section Titles */
     .section-title {
         text-align: center;
         color: #333;
-        margin-bottom: 40px;
-        font-size: 2rem;
+        margin-bottom: 50px;
+        font-size: 2.2rem;
         font-weight: bold;
+        position: relative;
+        padding-bottom: 20px;
+    }
+
+    .section-title::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60px;
+        height: 4px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        border-radius: 2px;
+    }
+
+    /* Flow Diagram Section */
+    .flow-diagram-section {
+        margin-bottom: 100px !important;
+        background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%) !important;
+        padding: 80px 20px !important;
+        margin-left: -20px !important;
+        margin-right: -20px !important;
+    }
+
+    .flow-diagram {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 0 !important;
+        flex-wrap: nowrap !important;
+        max-width: 1400px !important;
+        margin: 0 auto !important;
+        padding: 40px 20px !important;
+        overflow-x: auto !important;
+    }
+
+    .flow-box-1, .flow-box-2, .flow-box-3, .flow-box-4, .flow-box-5 {
+        border-radius: 20px !important;
+        padding: 40px 30px !important;
+        text-align: center !important;
+        min-width: 200px !important;
+        flex-shrink: 0 !important;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12) !important;
+        transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+        position: relative !important;
+        border: 3px solid transparent !important;
+    }
+
+    .flow-box-1, .flow-box-2, .flow-box-3, .flow-box-4, .flow-box-5 {
+        color: white !important;
+    }
+
+    .flow-box-1, .flow-box-2, .flow-box-3, .flow-box-4, .flow-box-5 h3 {
+        font-weight: 800 !important;
+        font-size: 1.4rem !important;
+        margin-bottom: 12px !important;
+        letter-spacing: 0.5px !important;
+        color: white !important;
+    }
+
+    .flow-box-1, .flow-box-2, .flow-box-3, .flow-box-4, .flow-box-5 p {
+        font-size: 0.95rem !important;
+        margin-bottom: 18px !important;
+        opacity: 0.95 !important;
+        font-weight: 500 !important;
+        color: white !important;
+    }
+
+    .flow-box-1, .flow-box-2, .flow-box-3, .flow-box-4, .flow-box-5 a {
+        display: inline-block !important;
+        background: rgba(255, 255, 255, 0.25) !important;
+        color: white !important;
+        padding: 10px 24px !important;
+        border-radius: 25px !important;
+        text-decoration: none !important;
+        font-size: 0.9rem !important;
+        font-weight: 700 !important;
+        transition: all 0.3s ease !important;
+        border: 2px solid rgba(255, 255, 255, 0.4) !important;
+    }
+
+    .flow-box-1, .flow-box-2, .flow-box-3, .flow-box-4, .flow-box-5 a:hover {
+        background: rgba(255, 255, 255, 0.4) !important;
+        transform: scale(1.1) !important;
+        border-color: rgba(255, 255, 255, 0.8) !important;
+        color: white !important;
+        text-decoration: none !important;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    .flow-box-1:hover, .flow-box-2:hover, .flow-box-3:hover, .flow-box-4:hover, .flow-box-5:hover {
+        transform: translateY(-15px) scale(1.08) !important;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25) !important;
+        border-color: rgba(255, 255, 255, 0.5) !important;
+    }
+
+    .flow-box-1 {
+        background: linear-gradient(135deg, #667eea 0%, #5568d3 100%) !important;
+    }
+
+    .flow-box-2 {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
+    }
+
+    .flow-box-3 {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
+    }
+
+    .flow-box-4 {
+        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%) !important;
+    }
+
+    .flow-box-5 {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%) !important;
+    }
+
+    .flow-arrow {
+        font-size: 2.5rem !important;
+        color: #667eea !important;
+        font-weight: bold !important;
+        min-width: 50px !important;
+        text-align: center !important;
+        flex-shrink: 0 !important;
+        animation: pulse-arrow 2s ease-in-out infinite !important;
+    }
+
+    @keyframes pulse-arrow {
+        0%, 100% { transform: translateX(0); opacity: 0.7; }
+        50% { transform: translateX(8px); opacity: 1; }
+    }
+
+    @media (max-width: 1024px) {
+        .flow-diagram {
+            gap: 0;
+            padding: 30px 10px;
+        }
+
+        .flow-box {
+            min-width: 170px;
+            padding: 30px 20px;
+        }
+
+        .flow-title {
+            font-size: 1.2rem;
+        }
+
+        .flow-description {
+            font-size: 0.85rem;
+        }
+
+        .flow-arrow {
+            font-size: 2rem;
+            min-width: 40px;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .flow-diagram {
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .flow-box {
+            min-width: 150px;
+            padding: 25px 15px;
+        }
+
+        .flow-title {
+            font-size: 1.1rem;
+        }
+
+        .flow-arrow {
+            transform: rotate(90deg);
+            min-width: 30px;
+            font-size: 2rem;
+        }
     }
 
     /* Features Section */
@@ -156,44 +439,65 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
         gap: 30px;
-        max-width: 1000px;
+        max-width: 1100px;
         margin: 0 auto;
     }
 
     .feature-card {
         background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        padding: 40px 30px;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.08);
         text-align: center;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        transition: all 0.3s ease;
+        border: 1px solid rgba(0,0,0,0.05);
+        position: relative;
+    }
+
+    .feature-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        border-radius: 15px 15px 0 0;
+        opacity: 0;
+        transition: opacity 0.3s ease;
     }
 
     .feature-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        transform: translateY(-8px);
+        box-shadow: 0 12px 25px rgba(0,0,0,0.15);
+    }
+
+    .feature-card:hover::before {
+        opacity: 1;
     }
 
     .feature-card h3 {
         color: #333;
         margin-bottom: 15px;
         font-size: 1.3rem;
+        font-weight: 600;
     }
 
     .feature-card p {
         color: #666;
-        line-height: 1.5;
+        line-height: 1.6;
+        font-size: 0.95rem;
     }
 
     /* Workflow Section */
     .workflow-section {
-        background-color: #f8f9fa;
-        padding: 60px 20px;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        padding: 80px 20px;
         margin: 0 -20px 60px -20px;
     }
 
     .workflow-steps {
-        max-width: 800px;
+        max-width: 900px;
         margin: 0 auto;
     }
 
@@ -201,25 +505,33 @@
         display: flex;
         align-items: center;
         background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
+        padding: 35px;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        margin-bottom: 25px;
+        border-left: 5px solid #667eea;
+        transition: all 0.3s ease;
+    }
+
+    .workflow-step:hover {
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        transform: translateX(5px);
     }
 
     .step-number {
-        background: #667eea;
+        background: linear-gradient(135deg, #667eea, #764ba2);
         color: white;
-        width: 50px;
-        height: 50px;
+        width: 60px;
+        height: 60px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.5rem;
+        font-size: 1.8rem;
         font-weight: bold;
         margin-right: 30px;
         flex-shrink: 0;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
     }
 
     .step-content {
@@ -230,26 +542,29 @@
         color: #333;
         margin-bottom: 10px;
         font-size: 1.4rem;
+        font-weight: 600;
     }
 
     .step-content p {
         color: #666;
         margin-bottom: 15px;
-        line-height: 1.5;
+        line-height: 1.6;
     }
 
     .step-button {
-        background: #667eea;
+        background: linear-gradient(135deg, #667eea, #764ba2);
         color: white;
-        padding: 10px 20px;
-        border-radius: 5px;
+        padding: 10px 25px;
+        border-radius: 25px;
         text-decoration: none;
         font-weight: bold;
-        transition: background-color 0.3s ease;
+        transition: all 0.3s ease;
+        display: inline-block;
     }
 
     .step-button:hover {
-        background: #5a6fd8;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
         color: white;
         text-decoration: none;
     }
@@ -258,7 +573,13 @@
         text-align: center;
         font-size: 2rem;
         color: #667eea;
-        margin: 10px 0;
+        margin: 15px 0;
+        animation: bounce 2s infinite;
+    }
+
+    @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(10px); }
     }
 
     /* Quick Links Section */
@@ -268,33 +589,53 @@
 
     .quick-links-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 20px;
-        max-width: 800px;
+        max-width: 1000px;
         margin: 0 auto;
     }
 
     .quick-link {
         background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 30px 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.08);
         text-align: center;
         text-decoration: none;
         color: #333;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .quick-link::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+        transition: left 0.5s ease;
     }
 
     .quick-link:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        transform: translateY(-8px);
+        box-shadow: 0 12px 25px rgba(0,0,0,0.15);
         text-decoration: none;
         color: #667eea;
+        border-color: #667eea;
+    }
+
+    .quick-link:hover::before {
+        left: 100%;
     }
 
     .quick-link-text {
-        font-weight: bold;
-        font-size: 1.1rem;
+        font-weight: 600;
+        font-size: 1rem;
+        transition: color 0.3s ease;
     }
 
     /* Responsive Design */
@@ -307,6 +648,16 @@
             font-size: 1.2rem;
         }
 
+        .hero-buttons {
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hero-button {
+            width: 100%;
+            max-width: 300px;
+        }
+
         .workflow-step {
             flex-direction: column;
             text-align: center;
@@ -315,6 +666,18 @@
         .step-number {
             margin-right: 0;
             margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+        }
+
+        .features-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .quick-links-grid {
+            grid-template-columns: repeat(2, 1fr);
         }
     }
 </style>
