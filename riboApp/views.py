@@ -14,7 +14,10 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from ribopy import Ribo
+try:
+    from ribopy import Ribo
+except ImportError:
+    Ribo = None
 import pickle
 from django.core.cache import cache
 from django.http import JsonResponse
@@ -2806,7 +2809,10 @@ def combined_pca_gene_counts(request):
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-from ribopy import Ribo
+try:
+    from ribopy import Ribo
+except ImportError:
+    Ribo = None
 from django.conf import settings
 from django.shortcuts import render
 from django.http import HttpResponse
