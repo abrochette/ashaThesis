@@ -26,7 +26,11 @@ SECRET_KEY = "django-insecure-s+oqvjhoundxa@^9l+&h5dk+qe$a@gil1^sp)j5gyp2r&anfl)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "ashaThesis-env.eba-ieshpytk.us-west-2.elasticbeanstalk.com",
+    "localhost",
+    "127.0.0.1",
+]
 
 CACHES = {
     "default": {
