@@ -3470,9 +3470,9 @@ def download_pca_csv(request):
     pivot_df = pivot_df.merge(gene_lengths, left_index=True, right_on="gene_name", how="inner")
     pivot_df.set_index("gene_name", inplace=True)
 
-    sample_cols = [col for col in pivot_df.columns if col != "length"]
+    sample_cols = [col for col in pivot_df.columns if col != "length_kb"]
     for col in sample_cols:
-        pivot_df[col] = (pivot_df[col] * 1e9) / (pivot_df["length"] * pivot_df[sample_cols].sum().sum())
+        pivot_df[col] = (pivot_df[col] * 1e9) / (pivot_df["length_kb"] * pivot_df[sample_cols].sum().sum())
 
     # Perform PCA
     from sklearn.decomposition import PCA
