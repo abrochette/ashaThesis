@@ -48,7 +48,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "riboApp.apps.RiboappConfig",
-    'django_plotly_dash.apps.DjangoPlotlyDashConfig',
+    # 'django_plotly_dash.apps.DjangoPlotlyDashConfig',  # Temporarily disabled due to Flask/Jinja2 compatibility issues
     "channels",
     "channels_redis",
     "crispy_forms",
@@ -66,7 +66,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    'django_plotly_dash.middleware.BaseMiddleware',
+    # 'django_plotly_dash.middleware.BaseMiddleware',  # Temporarily disabled due to Flask/Jinja2 compatibility issues
 ]
 
 ROOT_URLCONF = "ashaThesis.urls"
