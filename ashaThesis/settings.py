@@ -30,6 +30,7 @@ ALLOWED_HOSTS = [
     "ashaThesis-env.eba-ieshpytk.us-west-2.elasticbeanstalk.com",
     "localhost",
     "127.0.0.1",
+    "*",  # Allow all hosts for Elastic Beanstalk internal requests
 ]
 
 CACHES = {
