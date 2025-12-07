@@ -12,8 +12,8 @@ import re
 # from sklearn.decomposition import PCA  # Temporarily disabled - scipy/sklearn too heavy for free tier
 import glob
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+# import matplotlib.pyplot as plt  # Temporarily disabled - too heavy for free tier
+# import seaborn as sns  # Temporarily disabled - too heavy for free tier
 try:
     from ribopy import Ribo
 except ImportError:
@@ -2808,7 +2808,7 @@ def combined_pca_gene_counts(request):
 
 import os
 import pandas as pd
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt  # Temporarily disabled - too heavy for free tier
 try:
     from ribopy import Ribo
 except ImportError:
