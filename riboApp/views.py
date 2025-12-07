@@ -9,7 +9,7 @@ from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
 import json
 import re
-from sklearn.decomposition import PCA
+# from sklearn.decomposition import PCA  # Temporarily disabled - scipy/sklearn too heavy for free tier
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
