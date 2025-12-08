@@ -161,6 +161,6 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
-        'LOCATION': '/tmp/django_cache',  # Change this to a persistent directory
+        'LOCATION': '/var/app/data/django_cache',  # Use persistent directory on Elastic Beanstalk
     }
 }
