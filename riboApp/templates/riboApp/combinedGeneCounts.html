@@ -26,6 +26,12 @@
     <button type="submit">Generate Combined Plot</button>
 </form>
 
+{% if error_message %}
+    <div style="background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #dc3545;">
+        <strong>Error:</strong> {{ error_message }}
+    </div>
+{% endif %}
+
 <hr>
 
 {% if plot_div %}

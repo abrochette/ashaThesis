@@ -620,6 +620,10 @@ def geneCounts(request):
     file1 = None
     file2 = None
 
+    # Check if any files are available
+    if not parquet_files:
+        return render(request, "riboApp/error.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."})
+
     if request.method == "POST":
         file1 = request.POST.get("file1")
         file2 = request.POST.get("file2")
@@ -727,6 +731,10 @@ def log2_geneCounts(request):
     plot_div = None
     file1 = None
     file2 = None
+
+    # Check if any files are available
+    if not parquet_files:
+        return render(request, "riboApp/error.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."})
 
     if request.method == "POST":
         file1 = request.POST.get("file1")
@@ -1110,6 +1118,11 @@ def delta_analysis(request):
     ribo_file2 = None
     mrna_file1 = None
     mrna_file2 = None
+    error_message = None
+
+    # Check if any files are available
+    if not ribo_files or not mrna_files:
+        error_message = "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."
 
     if request.method == "POST":
         ribo_file1 = request.POST.get("ribo_file1")
@@ -1209,6 +1222,7 @@ def delta_analysis(request):
         "ribo_file2": ribo_file2,
         "mrna_file1": mrna_file1,
         "mrna_file2": mrna_file2,
+        "error_message": error_message,
     })
 
 
@@ -1222,6 +1236,11 @@ def combined_geneCounts(request):
     plot_div = None
     ribo_file = None
     mrna_file = None
+    error_message = None
+
+    # Check if any files are available
+    if not ribo_files or not mrna_files:
+        error_message = "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."
 
     if request.method == "POST":
         ribo_file = request.POST.get("ribo_file")
@@ -1266,6 +1285,7 @@ def combined_geneCounts(request):
         "plot_div": plot_div,
         "ribo_file": ribo_file,
         "mrna_file": mrna_file,
+        "error_message": error_message,
     })
 
 
@@ -1278,6 +1298,10 @@ def bin_counts_view(request):
     error_message = None
 
     selected_file = request.GET.get("selected_file", "")
+
+    # Check if any files are available
+    if not parquet_files:
+        error_message = "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."
 
     if request.method == "POST":
         selected_file = request.POST.get("selected_file")
@@ -1429,6 +1453,10 @@ def read_length_distribution_view(request):
     plots = None
     error_message = None
     selected_files = []
+
+    # Check if any files are available
+    if not parquet_files:
+        error_message = "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."
 
     if request.method == "POST":
         selected_files = request.POST.getlist("selected_files")
@@ -1669,6 +1697,10 @@ def psite_offset_view(request):
     selected_files = []
     current_offsets = {}
 
+    # Check if any files are available
+    if not parquet_files:
+        error_message = "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."
+
     # Load current P-site offsets if they exist
     if os.path.exists(OFFSET_CSV):
         try:
@@ -1779,6 +1811,10 @@ def stop_codon_readthrough(request):
     selected_files = []
 
     has_csv_data = False
+
+    # Check if any files are available
+    if not parquet_files:
+        error_message = "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."
 
     if request.method == "POST":
         selected_files = request.POST.getlist("selected_files")
@@ -2585,6 +2621,14 @@ def pca_gene_counts(request):
     if not os.path.exists(GTF_FILE):
         return render(request, "riboApp/error.html", {"error_message": "GTF file not found!"})
 
+    # Check if any parquet files are available
+    parquet_files = sorted([
+        os.path.basename(f) for f in glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet"))
+        if not os.path.basename(f).startswith(".")
+    ])
+    if not parquet_files:
+        return render(request, "riboApp/error.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."})
+
     cache_key = build_pca_cache_key()
     if cache_key is None:
         return render(request, "riboApp/error.html", {"error_message": "Failed to build cache key!"})
@@ -2707,7 +2751,7 @@ def combined_pca_gene_counts(request):
 
     all_files = ribo_files + mrna_files
     if not all_files:
-        return render(request, "riboApp/error.html", {"error_message": "No Parquet files found!"})
+        return render(request, "riboApp/error.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."})
 
     cache_key = f"combined_pca_{'_'.join(all_files)}"
     hashed_key = hashlib.md5(cache_key.encode()).hexdigest()
@@ -3024,6 +3068,10 @@ def psite_metagene_plots(request):
     start_plot = None
     stop_plot = None
     error_message = None
+
+    # Check if any files are available
+    if not parquet_files:
+        error_message = "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."
 
     if request.method == "POST":
         selected_files = request.POST.getlist("selected_files")
