@@ -4,11 +4,12 @@ from .models import ProcessingInput
 from .forms import CreateNewList
 import mimetypes
 import yaml
-from .forms import ParquetUploadForm, MrnaParquetUploadForm, BulkParquetUploadForm, BulkMrnaParquetUploadForm
+from .forms import ParquetUploadForm, MrnaParquetUploadForm, BulkParquetUploadForm, BulkMrnaParquetUploadForm, PsiteOffsetUploadForm
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
 import json
 import re
+import threading
 # from sklearn.decomposition import PCA  # Temporarily disabled - scipy/sklearn too heavy for free tier
 import glob
 import numpy as np
@@ -320,10 +321,19 @@ def get_gene_reads(gene_name):
             all_data.append(filtered_df)
 
     return pd.concat(all_data, ignore_index=True)
+def _cache_file_in_background(file_path, file_type):
+    """Background thread function to cache file without blocking upload"""
+    try:
+        create_file_preprocessing_cache(file_path, file_type)
+        print(f"Background caching completed for {os.path.basename(file_path)}")
+    except Exception as e:
+        print(f"Error during background caching of {file_path}: {str(e)}")
+
 # Upload and store all Parquet data
 def upload_parquet(request):
     bulk_ribo_form = BulkParquetUploadForm()
     bulk_mrna_form = BulkMrnaParquetUploadForm()
+    psite_offset_form = PsiteOffsetUploadForm()
 
     if request.method == "POST":
         # Check which form was submitted
@@ -341,20 +351,31 @@ def upload_parquet(request):
                             uploaded_file = UploadedParquet(file=file)
                             uploaded_file.save()
 
-                            # Validate the file
+                            # Quick validation: only read schema, not entire file
                             file_path = uploaded_file.file.path
-                            df = pq.read_table(file_path).to_pandas()
+                            try:
+                                pq_file = pq.ParquetFile(file_path)
+                                columns = set(pq_file.schema.names)
+                            except Exception as e:
+                                uploaded_file.delete()
+                                failed_uploads.append(f"{file.name}: Invalid parquet file - {str(e)}")
+                                continue
 
                             required_columns = {"transcript_id", "gene_name", "start_position", "end_position",
                                               "strand", "read_id", "read_length", "read_count", "region", "source_file"}
 
-                            missing_columns = required_columns - set(df.columns)
+                            missing_columns = required_columns - columns
                             if missing_columns:
                                 uploaded_file.delete()  # Remove invalid file
                                 failed_uploads.append(f"{file.name}: missing columns {', '.join(missing_columns)}")
                             else:
-                                # 🚀 Create preprocessing cache for faster analysis
-                                create_file_preprocessing_cache(file_path, "riboseq")
+                                # Start background caching thread (non-blocking)
+                                cache_thread = threading.Thread(
+                                    target=_cache_file_in_background,
+                                    args=(file_path, "riboseq"),
+                                    daemon=True
+                                )
+                                cache_thread.start()
                                 successful_uploads += 1
 
                         except Exception as e:
@@ -365,7 +386,7 @@ def upload_parquet(request):
                 if successful_uploads > 0:
                     # Clear global caches since new files were uploaded
                     clear_global_caches()
-                    messages.success(request, f"Successfully uploaded {successful_uploads} riboseq files")
+                    messages.success(request, f"Successfully uploaded {successful_uploads} riboseq files. Preprocessing will continue in the background.")
                 if failed_uploads:
                     messages.error(request, f"Failed uploads: {'; '.join(failed_uploads)}")
 
@@ -385,20 +406,31 @@ def upload_parquet(request):
                             uploaded_file = UploadedMrnaParquet(file=file)
                             uploaded_file.save()
 
-                            # Validate the file
+                            # Quick validation: only read schema, not entire file
                             file_path = uploaded_file.file.path
-                            df = pq.read_table(file_path).to_pandas()
+                            try:
+                                pq_file = pq.ParquetFile(file_path)
+                                columns = set(pq_file.schema.names)
+                            except Exception as e:
+                                uploaded_file.delete()
+                                failed_uploads.append(f"{file.name}: Invalid parquet file - {str(e)}")
+                                continue
 
                             required_columns = {"transcript_id", "gene_name", "start_position", "end_position",
                                               "strand", "read_id", "read_length", "read_count", "region", "source_file"}
 
-                            missing_columns = required_columns - set(df.columns)
+                            missing_columns = required_columns - columns
                             if missing_columns:
                                 uploaded_file.delete()  # Remove invalid file
                                 failed_uploads.append(f"{file.name}: missing columns {', '.join(missing_columns)}")
                             else:
-                                # 🚀 Create preprocessing cache for faster analysis
-                                create_file_preprocessing_cache(file_path, "mrna")
+                                # Start background caching thread (non-blocking)
+                                cache_thread = threading.Thread(
+                                    target=_cache_file_in_background,
+                                    args=(file_path, "mrna"),
+                                    daemon=True
+                                )
+                                cache_thread.start()
                                 successful_uploads += 1
 
                         except Exception as e:
@@ -409,17 +441,39 @@ def upload_parquet(request):
                 if successful_uploads > 0:
                     # Clear global caches since new files were uploaded
                     clear_global_caches()
-                    messages.success(request, f"Successfully uploaded {successful_uploads} mRNA files")
+                    messages.success(request, f"Successfully uploaded {successful_uploads} mRNA files. Preprocessing will continue in the background.")
                 if failed_uploads:
                     messages.error(request, f"Failed uploads: {'; '.join(failed_uploads)}")
 
                 return redirect("upload_parquet")
 
-
+        elif 'psite_offset_submit' in request.POST:
+            psite_offset_form = PsiteOffsetUploadForm(request.POST, request.FILES)
+            if psite_offset_form.is_valid():
+                uploaded_file = request.FILES.get('offset_csv')
+                if uploaded_file:
+                    try:
+                        # Read and validate CSV
+                        df = pd.read_csv(uploaded_file)
+                        required_columns = {"Experiment", "Read Length", "P-site Offset"}
+                        if not required_columns.issubset(set(df.columns)):
+                            messages.error(request, f"CSV must contain columns: {', '.join(required_columns)}")
+                        else:
+                            # Save the CSV file
+                            df.to_csv(OFFSET_CSV, index=False)
+                            # Clear P-site offset cache
+                            clear_global_caches()
+                            messages.success(request, "P-site offset CSV uploaded successfully!")
+                    except Exception as e:
+                        messages.error(request, f"Error processing CSV: {str(e)}")
+                else:
+                    messages.error(request, "No file uploaded!")
+                return redirect("upload_parquet")
 
     return render(request, "riboApp/uploadParquet.html", {
         "bulk_ribo_form": bulk_ribo_form,
-        "bulk_mrna_form": bulk_mrna_form
+        "bulk_mrna_form": bulk_mrna_form,
+        "psite_offset_form": psite_offset_form
     })
 
 def clear_parquet_files(request):

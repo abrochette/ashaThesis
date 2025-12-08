@@ -74,4 +74,11 @@ class BulkMrnaParquetUploadForm(forms.Form):
         help_text="Hold Ctrl/Cmd to select multiple files, or drag and drop a folder"
     )
 
+class PsiteOffsetUploadForm(forms.Form):
+    offset_csv = forms.FileField(
+        label="Upload P-site Offset CSV",
+        required=False,
+        help_text="CSV file with columns: Experiment, Read Length, P-site Offset"
+    )
+
 

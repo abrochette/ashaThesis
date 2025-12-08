@@ -4,6 +4,28 @@
 {% block content %}
     <h1>P-site Offset Analysis</h1>
 
+    <!-- Quick Upload Section -->
+    <div style="background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 5px; padding: 20px; margin-bottom: 20px;">
+        <h2 style="color: #856404; margin-top: 0;">Quick Upload P-site Offsets</h2>
+        <p style="color: #856404; margin-bottom: 15px;">
+            Upload your P-site offset CSV file directly here. This will be used in all downstream analyses.
+        </p>
+        <form method="POST" enctype="multipart/form-data" style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: flex-end;">
+            {% csrf_token %}
+            <div>
+                <label for="quick_offset_csv" style="color: #856404; font-weight: bold;">Select CSV File:</label>
+                <input type="file" name="offset_csv" id="quick_offset_csv" accept=".csv"
+                       style="margin-top: 5px; padding: 8px; width: 100%; border: 1px solid #ddd; border-radius: 4px;">
+                <small style="color: #856404; display: block; margin-top: 5px;">
+                    Required columns: "Experiment", "Read Length", "P-site Offset"
+                </small>
+            </div>
+            <button type="submit" name="action" value="upload_csv" class="btn" style="background-color: #ffc107; color: #333; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                Upload CSV
+            </button>
+        </form>
+    </div>
+
     <div style="background-color: #e7f3ff; padding: 15px; border-radius: 5px; margin: 20px 0;">
         <h3>About This Analysis:</h3>
         <p>
