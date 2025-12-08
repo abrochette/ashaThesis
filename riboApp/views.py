@@ -2619,7 +2619,7 @@ def set_persistent_cache(cache_key, data):
 def pca_gene_counts(request):
 
     if not os.path.exists(GTF_FILE):
-        return render(request, "riboApp/error.html", {"error_message": "GTF file not found!"})
+        return render(request, "riboApp/pca_plot.html", {"error_message": "GTF file not found!"})
 
     # Check if any parquet files are available
     parquet_files = sorted([
@@ -2627,7 +2627,7 @@ def pca_gene_counts(request):
         if not os.path.basename(f).startswith(".")
     ])
     if not parquet_files:
-        return render(request, "riboApp/error.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."})
+        return render(request, "riboApp/pca_plot.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."})
 
     cache_key = build_pca_cache_key()
     if cache_key is None:
@@ -2737,7 +2737,7 @@ def combined_pca_gene_counts(request):
     """Combined PCA analysis for riboseq and mRNA files"""
 
     if not os.path.exists(GTF_FILE):
-        return render(request, "riboApp/error.html", {"error_message": "GTF file not found!"})
+        return render(request, "riboApp/combinedPca.html", {"error_message": "GTF file not found!"})
 
     # Build cache key for combined analysis
     ribo_files = sorted([
@@ -2751,7 +2751,7 @@ def combined_pca_gene_counts(request):
 
     all_files = ribo_files + mrna_files
     if not all_files:
-        return render(request, "riboApp/error.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."})
+        return render(request, "riboApp/combinedPca.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."})
 
     cache_key = f"combined_pca_{'_'.join(all_files)}"
     hashed_key = hashlib.md5(cache_key.encode()).hexdigest()

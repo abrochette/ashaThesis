@@ -27,7 +27,11 @@
 
 <hr>
 
-{% if pca_plot %}
+{% if error_message %}
+    <div style="background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #dc3545;">
+        <strong>Error:</strong> {{ error_message }}
+    </div>
+{% elif pca_plot %}
     <div style="margin-bottom: 15px;">
         <a href="{% url 'download_csv' 'combined_pca' %}"
            style="background-color: #28a745; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px; display: inline-block;">
