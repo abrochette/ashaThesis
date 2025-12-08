@@ -13,23 +13,23 @@
     {% endif %}
 
     <!-- P-site Offset Upload Section -->
-    <div style="background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 5px; padding: 20px; margin-bottom: 20px;">
-        <h2 style="color: #856404; margin-top: 0; margin-bottom: 15px;">P-site Offset Configuration</h2>
-        <p style="color: #856404; margin-bottom: 15px;">
+    <div style="background-color: #f5e6f5; border: 2px solid #d4a5d4; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+        <h2 style="color: #4a7ba7; margin-top: 0; margin-bottom: 15px;">P-site Offset Configuration</h2>
+        <p style="color: #666; margin-bottom: 15px;">
             Upload your P-site offset CSV file here. This file is required for accurate P-site positioning in all analyses.
         </p>
         <form method="post" enctype="multipart/form-data" class="form-group">
             {% csrf_token %}
             <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: flex-end;">
                 <div>
-                    <label for="offset_csv" style="color: #856404; font-weight: bold;">Select CSV File:</label>
+                    <label for="offset_csv" style="color: #4a7ba7; font-weight: bold;">Select CSV File:</label>
                     <input type="file" name="offset_csv" id="offset_csv" accept=".csv"
-                           style="margin-top: 5px; padding: 8px; width: 100%; border: 1px solid #ddd; border-radius: 4px;">
-                    <small style="color: #856404; display: block; margin-top: 5px;">
+                           style="margin-top: 5px; padding: 8px; width: 100%; border: 1px solid #d4a5d4; border-radius: 4px;">
+                    <small style="color: #666; display: block; margin-top: 5px;">
                         Format: Columns must be "Experiment", "Read Length", "P-site Offset"
                     </small>
                 </div>
-                <button type="submit" name="psite_offset_submit" class="btn" style="background-color: #ffc107; color: #333; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                <button type="submit" name="psite_offset_submit" class="btn btn-primary" style="padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; background-color: #d4a5d4; color: white;">
                     Upload P-site Offsets
                 </button>
             </div>
@@ -37,29 +37,29 @@
     </div>
 
     <!-- File Upload Section -->
-    <div style="background-color: white; border: 2px solid #0d47a1; border-radius: 5px; padding: 20px; margin-bottom: 20px;">
-        <h2 style="color: #0d47a1; margin-top: 0; margin-bottom: 20px;">Upload Data Files</h2>
+    <div style="background-color: white; border: 2px solid #4a7ba7; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+        <h2 style="color: #4a7ba7; margin-top: 0; margin-bottom: 20px;">Upload Data Files</h2>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
             <!-- Riboseq Upload -->
-            <div style="padding: 15px; background-color: #e3f2fd; border: 2px solid #368BC1; border-radius: 5px;">
-                <h3 style="color: #0d47a1; margin-top: 0; margin-bottom: 15px;">Riboseq Files</h3>
+            <div style="padding: 15px; background-color: #e8f1f7; border: 2px solid #4a7ba7; border-radius: 8px;">
+                <h3 style="color: #4a7ba7; margin-top: 0; margin-bottom: 15px;">Riboseq Files</h3>
                 <form method="post" enctype="multipart/form-data" class="form-group">
                     {% csrf_token %}
                     {{ bulk_ribo_form|crispy }}
-                    <button type="submit" name="bulk_ribo_submit" class="btn btn-primary" style="margin-top: 10px; width: 100%;">
+                    <button type="submit" name="bulk_ribo_submit" class="btn btn-primary" style="margin-top: 10px; width: 100%; background-color: #4a7ba7;">
                         Upload Riboseq Files
                     </button>
                 </form>
             </div>
 
             <!-- mRNA Upload -->
-            <div style="padding: 15px; background-color: #fff3e0; border: 2px solid #ff7f0e; border-radius: 5px;">
-                <h3 style="color: #0d47a1; margin-top: 0; margin-bottom: 15px;">mRNA Files</h3>
+            <div style="padding: 15px; background-color: #f5e6f5; border: 2px solid #d4a5d4; border-radius: 8px;">
+                <h3 style="color: #4a7ba7; margin-top: 0; margin-bottom: 15px;">mRNA Files</h3>
                 <form method="post" enctype="multipart/form-data" class="form-group">
                     {% csrf_token %}
                     {{ bulk_mrna_form|crispy }}
-                    <button type="submit" name="bulk_mrna_submit" class="btn" style="background-color: #ff7f0e; color: white; margin-top: 10px; width: 100%;">
+                    <button type="submit" name="bulk_mrna_submit" class="btn" style="background-color: #d4a5d4; color: white; margin-top: 10px; width: 100%; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
                         Upload mRNA Files
                     </button>
                 </form>
@@ -70,27 +70,27 @@
     <hr>
 
     <!-- Analysis Flow Guide -->
-    <div style="background-color: #f8f9fa; border: 2px solid #0d47a1; border-radius: 8px; padding: 25px; margin-bottom: 30px;">
-        <h2 style="color: #0d47a1; margin-top: 0; text-align: center;">Recommended Analysis Flow</h2>
+    <div style="background-color: white; border: 2px solid #4a7ba7; border-radius: 8px; padding: 25px; margin-bottom: 30px;">
+        <h2 style="color: #4a7ba7; margin-top: 0; text-align: center;">Recommended Analysis Flow</h2>
         <p style="text-align: center; color: #666; margin-bottom: 25px;">Follow this step-by-step guide for a comprehensive analysis of your data</p>
 
         <!-- Step 1: Quality Control -->
-        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #87AFC7; border-radius: 5px;">
+        <div style="margin-bottom: 25px; padding: 20px; background-color: #f5e6f5; border-left: 5px solid #d4a5d4; border-radius: 8px;">
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <div style="background-color: #87AFC7; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">1</div>
-                <h3 style="margin: 0; color: #0d47a1;">Quality Control - Assess Data Quality</h3>
+                <div style="background-color: #d4a5d4; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">1</div>
+                <h3 style="margin: 0; color: #4a7ba7;">Quality Control - Assess Data Quality</h3>
             </div>
             <p style="color: #666; margin-bottom: 15px;">Start by examining the overall quality and relationships between your samples.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'pca_plot' %}" style="text-decoration: none;">
-                    <div style="padding: 15px; background-color: #e7f3ff; border: 2px solid #87AFC7; border-radius: 5px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                        <div style="font-weight: bold; color: #0d47a1;">PCA Analysis</div>
+                    <div style="padding: 15px; background-color: #e8f1f7; border: 2px solid #4a7ba7; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s;">
+                        <div style="font-weight: bold; color: #4a7ba7;">PCA Analysis</div>
                         <small style="color: #666;">Visualize sample relationships</small>
                     </div>
                 </a>
                 <a href="{% url 'psite_metagene' %}" style="text-decoration: none;">
-                    <div style="padding: 15px; background-color: #ffe7e7; border: 2px solid #dc3545; border-radius: 5px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                        <div style="font-weight: bold; color: #0d47a1;">P-site Metagene</div>
+                    <div style="padding: 15px; background-color: #f5e6f5; border: 2px solid #d4a5d4; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s;">
+                        <div style="font-weight: bold; color: #4a7ba7;">P-site Metagene</div>
                         <small style="color: #666;">Check ribosome positioning</small>
                     </div>
                 </a>
@@ -98,16 +98,16 @@
         </div>
 
         <!-- Step 2: Read Length Analysis -->
-        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #28a745; border-radius: 5px;">
+        <div style="margin-bottom: 25px; padding: 20px; background-color: #e8f1f7; border-left: 5px solid #4a7ba7; border-radius: 8px;">
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <div style="background-color: #28a745; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">2</div>
-                <h3 style="margin: 0; color: #0d47a1;">Read Length Distribution</h3>
+                <div style="background-color: #4a7ba7; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">2</div>
+                <h3 style="margin: 0; color: #4a7ba7;">Read Length Distribution</h3>
             </div>
             <p style="color: #666; margin-bottom: 15px;">Analyze the distribution of read lengths across your samples to ensure data quality.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'readLengthDistribution' %}" style="text-decoration: none;">
-                    <div style="padding: 15px; background-color: #e8f5e9; border: 2px solid #28a745; border-radius: 5px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                        <div style="font-weight: bold; color: #0d47a1;">Read Length Distribution</div>
+                    <div style="padding: 15px; background-color: #e8f1f7; border: 2px solid #4a7ba7; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s;">
+                        <div style="font-weight: bold; color: #4a7ba7;">Read Length Distribution</div>
                         <small style="color: #666;">View read length patterns</small>
                     </div>
                 </a>
@@ -115,22 +115,22 @@
         </div>
 
         <!-- Step 3: Gene Count Analysis -->
-        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #368BC1; border-radius: 5px;">
+        <div style="margin-bottom: 25px; padding: 20px; background-color: #f5e6f5; border-left: 5px solid #d4a5d4; border-radius: 8px;">
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <div style="background-color: #368BC1; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">3</div>
-                <h3 style="margin: 0; color: #0d47a1;">Gene Count Analysis</h3>
+                <div style="background-color: #d4a5d4; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">3</div>
+                <h3 style="margin: 0; color: #4a7ba7;">Gene Count Analysis</h3>
             </div>
             <p style="color: #666; margin-bottom: 15px;">Examine gene expression levels and compare between samples.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'geneCounts' %}" style="text-decoration: none;">
-                    <div style="padding: 15px; background-color: #e3f2fd; border: 2px solid #368BC1; border-radius: 5px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                        <div style="font-weight: bold; color: #0d47a1;">Gene Counts</div>
+                    <div style="padding: 15px; background-color: #e8f1f7; border: 2px solid #4a7ba7; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s;">
+                        <div style="font-weight: bold; color: #4a7ba7;">Gene Counts</div>
                         <small style="color: #666;">Raw gene expression</small>
                     </div>
                 </a>
                 <a href="{% url 'log2GeneCounts' %}" style="text-decoration: none;">
-                    <div style="padding: 15px; background-color: #f3e5f5; border: 2px solid #6f42c1; border-radius: 5px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                        <div style="font-weight: bold; color: #0d47a1;">Gene Counts (Log₂)</div>
+                    <div style="padding: 15px; background-color: #f5e6f5; border: 2px solid #d4a5d4; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s;">
+                        <div style="font-weight: bold; color: #4a7ba7;">Gene Counts (Log₂)</div>
                         <small style="color: #666;">Log-transformed expression</small>
                     </div>
                 </a>
@@ -138,22 +138,22 @@
         </div>
 
         <!-- Step 4: Advanced Analysis -->
-        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #e74c3c; border-radius: 5px;">
+        <div style="margin-bottom: 25px; padding: 20px; background-color: #e8f1f7; border-left: 5px solid #4a7ba7; border-radius: 8px;">
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <div style="background-color: #e74c3c; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">4</div>
-                <h3 style="margin: 0; color: #0d47a1;">Advanced Analysis</h3>
+                <div style="background-color: #4a7ba7; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">4</div>
+                <h3 style="margin: 0; color: #4a7ba7;">Advanced Analysis</h3>
             </div>
             <p style="color: #666; margin-bottom: 15px;">Perform deeper analysis including replicate comparisons and ribosome occupancy patterns.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'delta_analysis' %}" style="text-decoration: none;">
-                    <div style="padding: 15px; background-color: #ffe7e7; border: 2px solid #e74c3c; border-radius: 5px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                        <div style="font-weight: bold; color: #0d47a1;">Delta Analysis</div>
+                    <div style="padding: 15px; background-color: #f5e6f5; border: 2px solid #d4a5d4; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s;">
+                        <div style="font-weight: bold; color: #4a7ba7;">Delta Analysis</div>
                         <small style="color: #666;">Replicate comparison</small>
                     </div>
                 </a>
                 <a href="{% url 'binCounts' %}" style="text-decoration: none;">
-                    <div style="padding: 15px; background-color: #e1f5fe; border: 2px solid #0099c6; border-radius: 5px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                        <div style="font-weight: bold; color: #0d47a1;">Bin Counts</div>
+                    <div style="padding: 15px; background-color: #e8f1f7; border: 2px solid #4a7ba7; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s;">
+                        <div style="font-weight: bold; color: #4a7ba7;">Bin Counts</div>
                         <small style="color: #666;">Ribosome occupancy</small>
                     </div>
                 </a>
@@ -161,22 +161,22 @@
         </div>
 
         <!-- Step 5: Combined Analysis -->
-        <div style="padding: 20px; background-color: white; border-left: 5px solid #6f42c1; border-radius: 5px;">
+        <div style="padding: 20px; background-color: #f5e6f5; border-left: 5px solid #d4a5d4; border-radius: 8px;">
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <div style="background-color: #6f42c1; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">5</div>
-                <h3 style="margin: 0; color: #0d47a1;">Combined Analysis (Riboseq + mRNA)</h3>
+                <div style="background-color: #d4a5d4; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">5</div>
+                <h3 style="margin: 0; color: #4a7ba7;">Combined Analysis (Riboseq + mRNA)</h3>
             </div>
             <p style="color: #666; margin-bottom: 15px;">Compare ribosome profiling and mRNA-seq data together for integrated insights.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'combined_geneCounts' %}" style="text-decoration: none;">
-                    <div style="padding: 15px; background-color: #e8f5e9; border: 2px solid #28a745; border-radius: 5px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                        <div style="font-weight: bold; color: #0d47a1;">Combined Gene Counts</div>
+                    <div style="padding: 15px; background-color: #e8f1f7; border: 2px solid #4a7ba7; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s;">
+                        <div style="font-weight: bold; color: #4a7ba7;">Combined Gene Counts</div>
                         <small style="color: #666;">Ribo vs mRNA comparison</small>
                     </div>
                 </a>
                 <a href="{% url 'combined_pca_plot' %}" style="text-decoration: none;">
-                    <div style="padding: 15px; background-color: #f3e5f5; border: 2px solid #6f42c1; border-radius: 5px; text-align: center; cursor: pointer; transition: all 0.3s;">
-                        <div style="font-weight: bold; color: #0d47a1;">Combined PCA</div>
+                    <div style="padding: 15px; background-color: #f5e6f5; border: 2px solid #d4a5d4; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s;">
+                        <div style="font-weight: bold; color: #4a7ba7;">Combined PCA</div>
                         <small style="color: #666;">Integrated sample analysis</small>
                     </div>
                 </a>
@@ -184,15 +184,15 @@
         </div>
     </div>
 
-    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-top: 15px; border-left: 4px solid #ffc107;">
-        <strong>Note:</strong> Bin count analysis is only available for riboseq data since mRNA data doesn't contain P-site positioning information required for ribosome occupancy mapping.
+    <div style="background-color: #e8f1f7; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #4a7ba7;">
+        <strong style="color: #4a7ba7;">Note:</strong> <span style="color: #666;">Bin count analysis is only available for riboseq data since mRNA data doesn't contain P-site positioning information required for ribosome occupancy mapping.</span>
     </div>
 
     <hr style="margin-top: 30px;">
 
     <!-- Preprocessing Section -->
-    <div style="background-color: rgba(255, 193, 7, 0.1); border: 2px solid rgba(255, 193, 7, 0.5); border-radius: 5px; padding: 20px; margin-bottom: 20px;">
-        <h2 style="color: #f57c00; margin-top: 0;">Speed Up Your Analysis</h2>
+    <div style="background-color: white; border: 2px solid #4a7ba7; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+        <h2 style="color: #4a7ba7; margin-top: 0;">Speed Up Your Analysis</h2>
         <p style="font-size: 16px; margin-bottom: 15px;">
             <strong>Pre-compute all analyses</strong> to make plotting instant (< 1 second instead of 10-12 seconds).
         </p>
@@ -209,7 +209,7 @@
         </p>
         <form method="post" action="{% url 'preprocess_all_files' %}">
             {% csrf_token %}
-            <button type="submit" class="btn btn-warning" style="font-size: 18px; padding: 12px 24px;">
+            <button type="submit" class="btn btn-primary" style="font-size: 18px; padding: 12px 24px; background-color: #4a7ba7;">
                 Preprocess All Files
             </button>
         </form>
@@ -221,14 +221,14 @@
     <hr style="margin-top: 30px;">
 
     <!-- Clear Files Section -->
-    <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; padding: 15px; margin-top: 20px;">
-        <h3 style="color: #721c24; margin-top: 0;">Clear All Files</h3>
-        <p style="color: #721c24; margin-bottom: 10px;">
+    <div style="background-color: #f5e6f5; border: 2px solid #d4a5d4; border-radius: 8px; padding: 15px; margin-top: 20px;">
+        <h3 style="color: #4a7ba7; margin-top: 0;">Clear All Files</h3>
+        <p style="color: #666; margin-bottom: 10px;">
             <strong>Warning:</strong> This will permanently delete all uploaded parquet files, cached data, and analysis results.
         </p>
         <form method="post" action="{% url 'clear_parquet_files' %}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete ALL parquet files and data? This cannot be undone!');">
             {% csrf_token %}
-            <button type="submit" class="btn btn-danger" style="background-color: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px;">
+            <button type="submit" class="btn btn-danger" style="background-color: #d4a5d4; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: bold;">
                 Clear All Files
             </button>
         </form>
