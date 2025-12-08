@@ -622,7 +622,7 @@ def geneCounts(request):
 
     # Check if any files are available
     if not parquet_files:
-        return render(request, "riboApp/error.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."})
+        return render(request, "riboApp/geneCounts.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis.", "parquet_files": []})
 
     if request.method == "POST":
         file1 = request.POST.get("file1")
@@ -734,7 +734,7 @@ def log2_geneCounts(request):
 
     # Check if any files are available
     if not parquet_files:
-        return render(request, "riboApp/error.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."})
+        return render(request, "riboApp/log2GeneCounts.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis.", "parquet_files": []})
 
     if request.method == "POST":
         file1 = request.POST.get("file1")
@@ -2637,7 +2637,7 @@ def pca_gene_counts(request):
 
     cache_key = build_pca_cache_key()
     if cache_key is None:
-        return render(request, "riboApp/error.html", {"error_message": "Failed to build cache key!"})
+        return render(request, "riboApp/pca_plot.html", {"error_message": "Failed to build cache key!"})
 
     print(f"Checking cache for key: {cache_key}")
 
@@ -2672,13 +2672,13 @@ def pca_gene_counts(request):
 
     gene_lengths = get_cached_gene_lengths()
     if gene_lengths.empty:
-        return render(request, "riboApp/error.html", {"error_message": "No gene lengths extracted from GTF!"})
+        return render(request, "riboApp/pca_plot.html", {"error_message": "No gene lengths extracted from GTF!"})
     print(gene_lengths.head())
 
     # Load all Parquet files
     parquet_files = glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet"))
     if not parquet_files:
-        return render(request, "riboApp/error.html", {"error_message": "No Parquet files found!"})
+        return render(request, "riboApp/pca_plot.html", {"error_message": "No Parquet files found!"})
 
     all_counts = []
     for file in parquet_files:
@@ -2694,7 +2694,7 @@ def pca_gene_counts(request):
     gene_counts_df = pd.merge(gene_counts_df, gene_lengths, on="gene_name", how="left")
     print(f"Columns in merged DataFrame: {gene_counts_df.columns.tolist()}")
     if "length_kb" not in gene_counts_df.columns:
-        return render(request, "riboApp/error.html", {"error_message": "'length_kb' column missing after merging!"})
+        return render(request, "riboApp/pca_plot.html", {"error_message": "'length_kb' column missing after merging!"})
 
     gene_counts_df.dropna(subset=["length_kb"], inplace=True)
     gene_counts_df["length_kb"] = pd.to_numeric(gene_counts_df["length_kb"], errors="coerce")
@@ -2705,7 +2705,7 @@ def pca_gene_counts(request):
     pivot_df = pivot_df.merge(gene_counts_df[["gene_name", "length_kb"]].drop_duplicates(), on="gene_name", how="left")
     pivot_df["length_kb"] = pd.to_numeric(pivot_df["length_kb"], errors="coerce")
     if pivot_df.empty:
-        return render(request, "riboApp/error.html", {"error_message": "No valid gene count data after pivoting!"})
+        return render(request, "riboApp/pca_plot.html", {"error_message": "No valid gene count data after pivoting!"})
 
     print(f"Pivoted DataFrame shape: {pivot_df.shape}")
     print(f"Columns in fixed pivot_df: {pivot_df.columns.tolist()}")
@@ -2783,7 +2783,7 @@ def combined_pca_gene_counts(request):
 
     gene_lengths = get_cached_gene_lengths()
     if gene_lengths.empty:
-        return render(request, "riboApp/error.html", {"error_message": "No gene lengths extracted from GTF!"})
+        return render(request, "riboApp/combinedPca.html", {"error_message": "No gene lengths extracted from GTF!"})
 
     # Load all Riboseq files
     all_counts = []
@@ -2801,7 +2801,7 @@ def combined_pca_gene_counts(request):
         all_counts.append(df_counts)
 
     if not all_counts:
-        return render(request, "riboApp/error.html", {"error_message": "No valid files found!"})
+        return render(request, "riboApp/combinedPca.html", {"error_message": "No valid files found!"})
 
     gene_counts_df = pd.concat(all_counts, ignore_index=True)
 
@@ -2823,7 +2823,7 @@ def combined_pca_gene_counts(request):
     pivot_df["length_kb"] = pd.to_numeric(pivot_df["length_kb"], errors="coerce")
 
     if pivot_df.empty:
-        return render(request, "riboApp/error.html", {"error_message": "No valid gene count data after pivoting!"})
+        return render(request, "riboApp/combinedPca.html", {"error_message": "No valid gene count data after pivoting!"})
 
     # RPKM Normalization
     sample_cols = [col for col in pivot_df.columns if col not in ("gene_name", "length_kb")]
