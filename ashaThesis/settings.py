@@ -57,6 +57,10 @@ INSTALLED_APPS = [
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
+# Increase file upload limits for large parquet files (5GB)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5368709120  # 5GB in bytes
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5368709120  # 5GB in bytes
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
