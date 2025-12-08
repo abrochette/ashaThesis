@@ -322,12 +322,37 @@ def get_gene_reads(gene_name):
 
     return pd.concat(all_data, ignore_index=True)
 def _cache_file_in_background(file_path, file_type):
-    """Background thread function to cache file without blocking upload"""
+    """Background thread function to validate and cache file without blocking upload"""
     try:
+        import time
+        time.sleep(2)  # Wait a bit to ensure file is fully written
+
+        # Validate file
+        try:
+            pq_file = pq.ParquetFile(file_path)
+            columns = set(pq_file.schema.names)
+            required_columns = {"transcript_id", "gene_name", "start_position", "end_position",
+                              "strand", "read_id", "read_length", "read_count", "region", "source_file"}
+            missing_columns = required_columns - columns
+
+            if missing_columns:
+                print(f"❌ Invalid file {os.path.basename(file_path)}: missing columns {', '.join(missing_columns)}")
+                # Delete invalid file
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                return
+        except Exception as e:
+            print(f"❌ Invalid parquet file {os.path.basename(file_path)}: {str(e)}")
+            # Delete invalid file
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return
+
+        # File is valid, create cache
         create_file_preprocessing_cache(file_path, file_type)
-        print(f"Background caching completed for {os.path.basename(file_path)}")
+        print(f"✅ Background caching completed for {os.path.basename(file_path)}")
     except Exception as e:
-        print(f"Error during background caching of {file_path}: {str(e)}")
+        print(f"❌ Error during background caching of {file_path}: {str(e)}")
 
 # Upload and store all Parquet data
 def upload_parquet(request):
@@ -350,33 +375,17 @@ def upload_parquet(request):
                             # Create UploadedParquet instance
                             uploaded_file = UploadedParquet(file=file)
                             uploaded_file.save()
-
-                            # Quick validation: only read schema, not entire file
                             file_path = uploaded_file.file.path
-                            try:
-                                pq_file = pq.ParquetFile(file_path)
-                                columns = set(pq_file.schema.names)
-                            except Exception as e:
-                                uploaded_file.delete()
-                                failed_uploads.append(f"{file.name}: Invalid parquet file - {str(e)}")
-                                continue
 
-                            required_columns = {"transcript_id", "gene_name", "start_position", "end_position",
-                                              "strand", "read_id", "read_length", "read_count", "region", "source_file"}
-
-                            missing_columns = required_columns - columns
-                            if missing_columns:
-                                uploaded_file.delete()  # Remove invalid file
-                                failed_uploads.append(f"{file.name}: missing columns {', '.join(missing_columns)}")
-                            else:
-                                # Start background caching thread (non-blocking)
-                                cache_thread = threading.Thread(
-                                    target=_cache_file_in_background,
-                                    args=(file_path, "riboseq"),
-                                    daemon=True
-                                )
-                                cache_thread.start()
-                                successful_uploads += 1
+                            # Skip validation during upload - validate in background thread
+                            # This prevents timeout when uploading multiple large files
+                            cache_thread = threading.Thread(
+                                target=_cache_file_in_background,
+                                args=(file_path, "riboseq"),
+                                daemon=True
+                            )
+                            cache_thread.start()
+                            successful_uploads += 1
 
                         except Exception as e:
                             failed_uploads.append(f"{file.name}: {str(e)}")
@@ -405,33 +414,17 @@ def upload_parquet(request):
                             # Create UploadedMrnaParquet instance
                             uploaded_file = UploadedMrnaParquet(file=file)
                             uploaded_file.save()
-
-                            # Quick validation: only read schema, not entire file
                             file_path = uploaded_file.file.path
-                            try:
-                                pq_file = pq.ParquetFile(file_path)
-                                columns = set(pq_file.schema.names)
-                            except Exception as e:
-                                uploaded_file.delete()
-                                failed_uploads.append(f"{file.name}: Invalid parquet file - {str(e)}")
-                                continue
 
-                            required_columns = {"transcript_id", "gene_name", "start_position", "end_position",
-                                              "strand", "read_id", "read_length", "read_count", "region", "source_file"}
-
-                            missing_columns = required_columns - columns
-                            if missing_columns:
-                                uploaded_file.delete()  # Remove invalid file
-                                failed_uploads.append(f"{file.name}: missing columns {', '.join(missing_columns)}")
-                            else:
-                                # Start background caching thread (non-blocking)
-                                cache_thread = threading.Thread(
-                                    target=_cache_file_in_background,
-                                    args=(file_path, "mrna"),
-                                    daemon=True
-                                )
-                                cache_thread.start()
-                                successful_uploads += 1
+                            # Skip validation during upload - validate in background thread
+                            # This prevents timeout when uploading multiple large files
+                            cache_thread = threading.Thread(
+                                target=_cache_file_in_background,
+                                args=(file_path, "mrna"),
+                                daemon=True
+                            )
+                            cache_thread.start()
+                            successful_uploads += 1
 
                         except Exception as e:
                             failed_uploads.append(f"{file.name}: {str(e)}")
