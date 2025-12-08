@@ -92,10 +92,18 @@ WSGI_APPLICATION = "ashaThesis.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/dev/ref/settings/#databases
 
+import os
+
+# Use persistent database location on Elastic Beanstalk
+if os.environ.get('DJANGO_SETTINGS_MODULE'):
+    db_path = '/var/app/data/db.sqlite3'
+else:
+    db_path = BASE_DIR / "db.sqlite3"
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": db_path,
     }
 }
 
