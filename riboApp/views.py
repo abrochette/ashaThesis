@@ -67,7 +67,7 @@ def reformatFilepaths(file_content):
             try:
                 experiment_name, filepath = line.split(' ', 1)
             except ValueError:
-                raise ValueError(f"Line '{line}' is not formatted as 'experiment_name /path/to/file' or 'experiment_name,/path/to/file'.")
+                raise ValueError(f"Line '{line}' is not formatted correctly. Each line must have either:\n  - Space-separated: 'experiment_name /path/to/file'\n  - Comma-separated: 'experiment_name,/path/to/file'\nExample: 'sample1_ribo /data/sample1.fastq.gz'")
 
         if experiment_name not in fastq_data:
             fastq_data[experiment_name] = []
@@ -151,12 +151,20 @@ def preProcess(response):
                 transcriptLengths = "appris_human_v2_transcript_lengths.tsv"
 
             # Process ribosome profiling file paths (use already-read content)
-            ribo_file_paths = reformatFilepaths(sample_file_content)
+            try:
+                ribo_file_paths = reformatFilepaths(sample_file_content)
+            except ValueError as e:
+                form.add_error('sampleFile', f"Invalid sample file format: {str(e)}")
+                return render(response, 'riboApp/preprocess.html', {'form': form})
 
             # Process mRNA-seq file paths if provided (use already-read content)
             if includeRnaSeq and mrnaSeqFile:
                 # mrna_file_content was already read above
-                mrna_file_paths = reformatFilepaths(mrna_file_content)
+                try:
+                    mrna_file_paths = reformatFilepaths(mrna_file_content)
+                except ValueError as e:
+                    form.add_error('mrnaSeqFile', f"Invalid mRNA-seq file format: {str(e)}")
+                    return render(response, 'riboApp/preprocess.html', {'form': form})
             else:
                 mrna_file_paths = ""
 
