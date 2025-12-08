@@ -2086,7 +2086,13 @@ def create_stop_codon_comparison_plot(all_stop_data):
     return fig.to_html(full_html=False)
 
 
-GTF_FILE = "media/gencode.vM25.annotation.gtf"  # Path to GTF file
+# Use persistent storage location for GTF file on Elastic Beanstalk
+import os
+if os.environ.get('DJANGO_SETTINGS_MODULE'):
+    GTF_FILE = "/var/app/data/gencode.vM25.annotation.gtf"
+else:
+    GTF_FILE = "media/gencode.vM25.annotation.gtf"
+
 PARQUET_FOLDER = "media/parquetFiles/"          # Path where Parquet files are stored
 TRANSCRIPTS_FASTA = "media/gencode.vM25.transcripts.fa"  # Path to transcript sequences
 GENOME_FASTA = "media/GRCm38.primary_assembly.genome.fa"  # Path to genome sequence
@@ -2618,16 +2624,16 @@ def set_persistent_cache(cache_key, data):
 
 def pca_gene_counts(request):
 
-    if not os.path.exists(GTF_FILE):
-        return render(request, "riboApp/pca_plot.html", {"error_message": "GTF file not found!"})
-
-    # Check if any parquet files are available
+    # Check if any parquet files are available first
     parquet_files = sorted([
         os.path.basename(f) for f in glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet"))
         if not os.path.basename(f).startswith(".")
     ])
     if not parquet_files:
         return render(request, "riboApp/pca_plot.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."})
+
+    if not os.path.exists(GTF_FILE):
+        return render(request, "riboApp/pca_plot.html", {"error_message": "GTF file not found!"})
 
     cache_key = build_pca_cache_key()
     if cache_key is None:
@@ -2736,9 +2742,6 @@ def pca_gene_counts(request):
 def combined_pca_gene_counts(request):
     """Combined PCA analysis for riboseq and mRNA files"""
 
-    if not os.path.exists(GTF_FILE):
-        return render(request, "riboApp/combinedPca.html", {"error_message": "GTF file not found!"})
-
     # Build cache key for combined analysis
     ribo_files = sorted([
         os.path.basename(f) for f in glob.glob(os.path.join(PARQUET_FOLDER, "*.parquet"))
@@ -2752,6 +2755,9 @@ def combined_pca_gene_counts(request):
     all_files = ribo_files + mrna_files
     if not all_files:
         return render(request, "riboApp/combinedPca.html", {"error_message": "No parquet files uploaded yet. Please upload preprocessed data files to begin analysis."})
+
+    if not os.path.exists(GTF_FILE):
+        return render(request, "riboApp/combinedPca.html", {"error_message": "GTF file not found!"})
 
     cache_key = f"combined_pca_{'_'.join(all_files)}"
     hashed_key = hashlib.md5(cache_key.encode()).hexdigest()
