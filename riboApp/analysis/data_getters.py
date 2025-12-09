@@ -277,17 +277,20 @@ def get_read_length_distribution(selected_files):
         file_path = os.path.join(PARQUET_FOLDER, selected_file)
         if not os.path.exists(file_path):
             continue
-        
+
         try:
             pq_file = pq.ParquetFile(file_path)
-            read_lengths = []
-            
+            read_length_counts_dict = {}
+
             for batch in pq_file.iter_batches(batch_size=100000, columns=["read_length"]):
                 df_chunk = batch.to_pandas()
-                read_lengths.extend(df_chunk["read_length"].tolist())
-            
-            if read_lengths:
-                read_length_counts = pd.Series(read_lengths).value_counts().sort_index()
+                # Count occurrences in this batch and accumulate
+                batch_counts = df_chunk["read_length"].value_counts()
+                for length, count in batch_counts.items():
+                    read_length_counts_dict[length] = read_length_counts_dict.get(length, 0) + count
+
+            if read_length_counts_dict:
+                read_length_counts = pd.Series(read_length_counts_dict).sort_index()
                 file_basename = os.path.splitext(selected_file)[0]
                 all_distributions[file_basename] = {
                     'lengths': read_length_counts.index.tolist(),
