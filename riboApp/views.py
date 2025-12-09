@@ -395,16 +395,10 @@ def upload_parquet(request):
                             full_file_path = uploaded_file.file.path
                             print(f"✅ Database record created for {file.name}")
 
-                            # Skip validation during upload - validate in background thread
-                            # This prevents timeout when uploading multiple large files
-                            cache_thread = threading.Thread(
-                                target=_cache_file_in_background,
-                                args=(full_file_path, "riboseq"),
-                                daemon=True
-                            )
-                            cache_thread.start()
+                            # Don't validate in background - just save and return
+                            # Validation will happen when user tries to use the file
                             successful_uploads += 1
-                            print(f"✅ Background thread started for {file.name}")
+                            print(f"✅ File saved successfully for {file.name}")
 
                         except Exception as e:
                             print(f"❌ Error uploading {file.name}: {str(e)}")
@@ -458,16 +452,10 @@ def upload_parquet(request):
                             full_file_path = uploaded_file.file.path
                             print(f"✅ Database record created for {file.name}")
 
-                            # Skip validation during upload - validate in background thread
-                            # This prevents timeout when uploading multiple large files
-                            cache_thread = threading.Thread(
-                                target=_cache_file_in_background,
-                                args=(full_file_path, "mrna"),
-                                daemon=True
-                            )
-                            cache_thread.start()
+                            # Don't validate in background - just save and return
+                            # Validation will happen when user tries to use the file
                             successful_uploads += 1
-                            print(f"✅ Background thread started for {file.name}")
+                            print(f"✅ File saved successfully for {file.name}")
 
                         except Exception as e:
                             print(f"❌ Error uploading {file.name}: {str(e)}")
