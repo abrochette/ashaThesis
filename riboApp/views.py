@@ -31,6 +31,7 @@ from django.shortcuts import render, redirect
 import pyarrow.parquet as pq
 from .models import SelectedGene, UploadedMrnaParquet, UploadedParquet
 import shutil
+from django.core.files.storage import default_storage
 
 
 
@@ -374,10 +375,6 @@ def upload_parquet(request):
                         try:
                             print(f"📥 Starting upload of {file.name} (size: {file.size} bytes)")
 
-                            # Stream file to disk in chunks to avoid memory issues
-                            import os
-                            from django.core.files.storage import default_storage
-
                             # Create the parquet files directory if it doesn't exist
                             parquet_dir = "parquetFiles"
                             os.makedirs(f"media/{parquet_dir}", exist_ok=True)
@@ -437,10 +434,6 @@ def upload_parquet(request):
                     if file.name.endswith('.parquet'):
                         try:
                             print(f"📥 Starting upload of {file.name} (size: {file.size} bytes)")
-
-                            # Stream file to disk in chunks to avoid memory issues
-                            import os
-                            from django.core.files.storage import default_storage
 
                             # Create the mRNA files directory if it doesn't exist
                             mrna_dir = "mrnaFiles"
