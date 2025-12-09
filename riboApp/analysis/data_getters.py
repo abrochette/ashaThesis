@@ -103,13 +103,13 @@ def clear_available_files_cache():
 # ============================================================================
 
 def load_or_build_gene_counts_dict(parquet_filename):
-    """Load or build gene counts dictionary with pickle caching"""
+    """Load or build gene counts dictionary with pickle caching - MEMORY EFFICIENT"""
     os.makedirs(PICKLE_FOLDER, exist_ok=True)
-    
+
     parquet_path = os.path.join(PARQUET_FOLDER, parquet_filename)
     base_name = os.path.splitext(parquet_filename)[0]
     pickle_path = os.path.join(PICKLE_FOLDER, f"{base_name}.pkl")
-    
+
     # Check if pickle exists and is newer than parquet
     if os.path.exists(pickle_path):
         parquet_mtime = os.path.getmtime(parquet_path)
@@ -118,31 +118,42 @@ def load_or_build_gene_counts_dict(parquet_filename):
             with open(pickle_path, "rb") as f:
                 print(f"Loading gene_counts_dict from pickle for {parquet_filename}")
                 return pickle.load(f)
-    
-    # Build from parquet
+
+    # Build from parquet - read in chunks to avoid OOM
     print(f"Building gene_counts_dict from parquet: {parquet_filename}")
-    df = pq.read_table(parquet_path, columns=["gene_name", "read_count"]).to_pandas()
-    gene_counts = df.groupby("gene_name", as_index=False)["read_count"].sum()
-    gene_counts_dict = dict(zip(gene_counts["gene_name"], gene_counts["read_count"]))
-    
+    gene_counts_dict = {}
+    pq_file = pq.ParquetFile(parquet_path)
+
+    for batch in pq_file.iter_batches(batch_size=100000, columns=["gene_name", "read_count"]):
+        df_chunk = batch.to_pandas()
+        batch_counts = df_chunk.groupby("gene_name")["read_count"].sum()
+        for gene, count in batch_counts.items():
+            gene_counts_dict[gene] = gene_counts_dict.get(gene, 0) + count
+
     # Save to pickle
     with open(pickle_path, "wb") as f:
         pickle.dump(gene_counts_dict, f)
         print(f"Saved pickle: {pickle_path}")
-    
+
     return gene_counts_dict
 
 
 def get_total_read_count(filename, file_type="riboseq"):
-    """Get total read count from a parquet file for normalization"""
+    """Get total read count from a parquet file for normalization - MEMORY EFFICIENT"""
     if file_type == "riboseq":
         file_path = os.path.join(PARQUET_FOLDER, filename)
     else:  # mrna
         file_path = os.path.join(MRNA_FOLDER, filename)
-    
+
     try:
-        df = pq.read_table(file_path, columns=["read_count"]).to_pandas()
-        total_reads = df["read_count"].sum()
+        # Read in chunks to avoid OOM
+        total_reads = 0
+        pq_file = pq.ParquetFile(file_path)
+
+        for batch in pq_file.iter_batches(batch_size=100000, columns=["read_count"]):
+            df_chunk = batch.to_pandas()
+            total_reads += df_chunk["read_count"].sum()
+
         print(f"Total reads in {filename}: {total_reads}")
         return total_reads
     except Exception as e:
@@ -155,7 +166,7 @@ def get_total_read_count(filename, file_type="riboseq"):
 # ============================================================================
 
 def get_region_gene_counts(filename, file_type="riboseq"):
-    """Get gene counts by region from a parquet file
+    """Get gene counts by region from a parquet file - MEMORY EFFICIENT
 
     Returns nested dictionary: {gene_name: {region: count}}
     """
@@ -169,22 +180,24 @@ def get_region_gene_counts(filename, file_type="riboseq"):
         return {}
 
     try:
-        # Read parquet file with region information
-        df = pq.read_table(file_path, columns=["gene_name", "read_count", "region"]).to_pandas()
-
-        # Group by gene and region, sum read counts
-        region_counts = df.groupby(['gene_name', 'region'])['read_count'].sum().reset_index()
-
-        # Convert to nested dictionary: {gene_name: {region: count}}
+        # Read parquet file in chunks to avoid OOM
         result = {}
-        for _, row in region_counts.iterrows():
-            gene = row['gene_name']
-            region = row['region']
-            count = row['read_count']
+        pq_file = pq.ParquetFile(file_path)
 
-            if gene not in result:
-                result[gene] = {}
-            result[gene][region] = count
+        for batch in pq_file.iter_batches(batch_size=100000, columns=["gene_name", "read_count", "region"]):
+            df_chunk = batch.to_pandas()
+
+            # Accumulate counts by gene and region
+            for _, row in df_chunk.iterrows():
+                gene = row['gene_name']
+                region = row['region']
+                count = row['read_count']
+
+                if gene not in result:
+                    result[gene] = {}
+                if region not in result[gene]:
+                    result[gene][region] = 0
+                result[gene][region] += count
 
         print(f"📊 Loaded region-specific counts for {len(result)} genes from {filename}")
         return result
@@ -195,12 +208,12 @@ def get_region_gene_counts(filename, file_type="riboseq"):
 
 
 def get_mrna_gene_counts_dict(mrna_filename):
-    """Get or create gene counts dictionary for mRNA file with caching"""
+    """Get or create gene counts dictionary for mRNA file with caching - MEMORY EFFICIENT"""
     os.makedirs(MRNA_PICKLE_FOLDER, exist_ok=True)
-    
+
     mrna_path = os.path.join(MRNA_FOLDER, mrna_filename)
     pickle_path = os.path.join(MRNA_PICKLE_FOLDER, mrna_filename.replace('.parquet', '.pkl'))
-    
+
     # Check if pickle exists and is newer
     if os.path.exists(pickle_path):
         mrna_mtime = os.path.getmtime(mrna_path)
@@ -209,17 +222,22 @@ def get_mrna_gene_counts_dict(mrna_filename):
             with open(pickle_path, "rb") as f:
                 print(f"Loading mRNA gene counts from pickle: {mrna_filename}")
                 return pickle.load(f)
-    
-    # Build from parquet
+
+    # Build from parquet - read in chunks to avoid OOM
     print(f"Building mRNA gene counts from parquet: {mrna_filename}")
-    df = pq.read_table(mrna_path, columns=["gene_name", "read_count"]).to_pandas()
-    gene_counts = df.groupby("gene_name", as_index=False)["read_count"].sum()
-    gene_counts_dict = dict(zip(gene_counts["gene_name"], gene_counts["read_count"]))
-    
+    gene_counts_dict = {}
+    pq_file = pq.ParquetFile(mrna_path)
+
+    for batch in pq_file.iter_batches(batch_size=100000, columns=["gene_name", "read_count"]):
+        df_chunk = batch.to_pandas()
+        batch_counts = df_chunk.groupby("gene_name")["read_count"].sum()
+        for gene, count in batch_counts.items():
+            gene_counts_dict[gene] = gene_counts_dict.get(gene, 0) + count
+
     # Save to pickle
     with open(pickle_path, "wb") as f:
         pickle.dump(gene_counts_dict, f)
-    
+
     return gene_counts_dict
 
 

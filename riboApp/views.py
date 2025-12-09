@@ -302,7 +302,7 @@ def locatePsites(response):
 
 
 def get_gene_reads(gene_name):
-    """Get reads for a specific gene from all parquet files"""
+    """Get reads for a specific gene from all parquet files - MEMORY EFFICIENT"""
     from .analysis.data_getters import get_available_parquet_files
 
     parquet_folder = "media/parquetFiles/"
@@ -313,13 +313,14 @@ def get_gene_reads(gene_name):
     for file in files:
         file_path = os.path.join(parquet_folder, file)
 
-        # Load only relevant columns
-        df = pq.read_table(file_path, columns=["gene_name", "read_count"]).to_pandas()
-
-        # Filter for the requested gene
-        filtered_df = df[df["gene_name"] == gene_name]
-        if not filtered_df.empty:
-            all_data.append(filtered_df)
+        # Read in chunks to avoid OOM
+        pq_file = pq.ParquetFile(file_path)
+        for batch in pq_file.iter_batches(batch_size=100000, columns=["gene_name", "read_count"]):
+            df_chunk = batch.to_pandas()
+            # Filter for the requested gene
+            filtered_df = df_chunk[df_chunk["gene_name"] == gene_name]
+            if not filtered_df.empty:
+                all_data.append(filtered_df)
 
     return pd.concat(all_data, ignore_index=True)
 def _cache_file_in_background(file_path, file_type):
