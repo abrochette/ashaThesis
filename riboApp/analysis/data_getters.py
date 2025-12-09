@@ -61,33 +61,41 @@ def get_available_mrna_parquet_files():
 def get_cached_available_files():
     """Get available files from global cache or scan if needed"""
     global _AVAILABLE_FILES_CACHE, _AVAILABLE_FILES_CACHE_TIMESTAMP
-    
+
     import time
     current_time = time.time()
-    
+
     # Check cache
-    if (_AVAILABLE_FILES_CACHE is not None and 
+    if (_AVAILABLE_FILES_CACHE is not None and
         _AVAILABLE_FILES_CACHE_TIMESTAMP is not None and
         current_time - _AVAILABLE_FILES_CACHE_TIMESTAMP < CACHE_TIMEOUT):
         print("🚀 Using cached file lists")
         return _AVAILABLE_FILES_CACHE
-    
+
     # Scan directories
     print("📊 Scanning for available files...")
     parquet_files = []
     mrna_files = []
-    
+
     if os.path.exists(PARQUET_FOLDER):
         parquet_files = sorted([f for f in os.listdir(PARQUET_FOLDER) if f.endswith(".parquet")])
-    
+
     if os.path.exists(MRNA_FOLDER):
         mrna_files = sorted([f for f in os.listdir(MRNA_FOLDER) if f.endswith(".parquet")])
-    
+
     _AVAILABLE_FILES_CACHE = (parquet_files, mrna_files)
     _AVAILABLE_FILES_CACHE_TIMESTAMP = current_time
-    
+
     print(f"💾 Found {len(parquet_files)} parquet files and {len(mrna_files)} mRNA files")
     return parquet_files, mrna_files
+
+
+def clear_available_files_cache():
+    """Clear the available files cache - call when files are uploaded/deleted"""
+    global _AVAILABLE_FILES_CACHE, _AVAILABLE_FILES_CACHE_TIMESTAMP
+    _AVAILABLE_FILES_CACHE = None
+    _AVAILABLE_FILES_CACHE_TIMESTAMP = None
+    print("🧹 Cleared available files cache")
 
 
 # ============================================================================

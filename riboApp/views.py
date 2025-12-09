@@ -417,6 +417,9 @@ def upload_parquet(request):
                 if successful_uploads > 0:
                     # Clear global caches since new files were uploaded
                     clear_global_caches()
+                    # Also clear the data_getters cache
+                    from .analysis.data_getters import clear_available_files_cache
+                    clear_available_files_cache()
                     messages.success(request, f"Successfully uploaded {successful_uploads} riboseq files. Preprocessing will continue in the background.")
                 if failed_uploads:
                     messages.error(request, f"Failed uploads: {'; '.join(failed_uploads)}")
@@ -477,6 +480,9 @@ def upload_parquet(request):
                 if successful_uploads > 0:
                     # Clear global caches since new files were uploaded
                     clear_global_caches()
+                    # Also clear the data_getters cache
+                    from .analysis.data_getters import clear_available_files_cache
+                    clear_available_files_cache()
                     messages.success(request, f"Successfully uploaded {successful_uploads} mRNA files. Preprocessing will continue in the background.")
                 if failed_uploads:
                     messages.error(request, f"Failed uploads: {'; '.join(failed_uploads)}")
