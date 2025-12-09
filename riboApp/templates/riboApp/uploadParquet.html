@@ -37,11 +37,11 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
             <!-- Riboseq Upload -->
             <div>
-                <p style="color: #87CEFA; margin: 0 0 8px 0; font-size: 0.95rem; font-weight: 500;">Riboseq Files</p>
+                <p style="color: #000000; margin: 0 0 8px 0; font-size: 0.95rem; font-weight: 500;">Riboseq Files</p>
                 <form method="post" enctype="multipart/form-data" class="form-group" style="display: flex; gap: 8px; align-items: center; margin: 0;">
                     {% csrf_token %}
                     {{ bulk_ribo_form|crispy }}
-                    <button type="submit" name="bulk_ribo_submit" style="padding: 13px 28px; background-color: #000000 !important; color: white !important; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; flex-shrink: 0; height: fit-content; margin: -4px 0 1px 0; font-weight: normal !important;">
+                    <button type="submit" name="bulk_ribo_submit" style="padding: 13px 28px; background-color: #000000 !important; color: white !important; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; flex-shrink: 0; height: fit-content; margin: -7px 0 1px 0; font-weight: normal !important;">
                         Upload
                     </button>
                 </form>
@@ -49,11 +49,11 @@
 
             <!-- mRNA Upload -->
             <div>
-                <p style="color: #c2185b; margin: 0 0 8px 0; font-size: 0.95rem; font-weight: 500;">mRNA Files</p>
+                <p style="color: #000000; margin: 0 0 8px 0; font-size: 0.95rem; font-weight: 500;">mRNA Files</p>
                 <form method="post" enctype="multipart/form-data" class="form-group" style="display: flex; gap: 8px; align-items: center; margin: 0;">
                     {% csrf_token %}
                     {{ bulk_mrna_form|crispy }}
-                    <button type="submit" name="bulk_mrna_submit" style="background-color: #000000 !important; color: white !important; padding: 13px 28px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; flex-shrink: 0; height: fit-content; margin: -4px 0 1px 0; font-weight: normal !important;">
+                    <button type="submit" name="bulk_mrna_submit" style="background-color: #000000 !important; color: white !important; padding: 13px 28px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; flex-shrink: 0; height: fit-content; margin: -7px 0 1px 0; font-weight: normal !important;">
                         Upload
                     </button>
                 </form>
