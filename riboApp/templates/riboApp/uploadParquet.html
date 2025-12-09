@@ -74,100 +74,100 @@
         <h2 style="color: #333; margin-top: 0; text-align: center;">Recommended Analysis Flow</h2>
         <p style="text-align: center; color: #666; margin-bottom: 25px;">Follow this step-by-step guide for a comprehensive analysis of your data</p>
 
-        <!-- Step 1: Quality Control - Green buttons -->
-        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #81c784; border-radius: 8px; border: 1px solid #e0e0e0;">
+        <!-- Step 1: Quality Control - Light Sky Blue buttons -->
+        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #81d4fa; border-radius: 8px; border: 1px solid #e0e0e0;">
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <div style="background-color: #81c784; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">1</div>
+                <div style="background-color: #81d4fa; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">1</div>
                 <h3 style="margin: 0; color: #333;">Quality Control - Assess Data Quality</h3>
             </div>
             <p style="color: #666; margin-bottom: 15px;">Start by examining the overall quality and relationships between your samples.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'pca_plot' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #81c784; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #81d4fa; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
                         PCA Analysis
                     </button>
                 </a>
                 <a href="{% url 'psite_metagene' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #81c784; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #81d4fa; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
                         P-site Metagene
                     </button>
                 </a>
             </div>
         </div>
 
-        <!-- Step 2: Read Length Analysis - Pink buttons -->
-        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #f48fb1; border-radius: 8px; border: 1px solid #e0e0e0;">
+        <!-- Step 2: Read Length Analysis - Light Green buttons -->
+        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #a5d6a7; border-radius: 8px; border: 1px solid #e0e0e0;">
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <div style="background-color: #f48fb1; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">2</div>
+                <div style="background-color: #a5d6a7; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">2</div>
                 <h3 style="margin: 0; color: #333;">Read Length Distribution</h3>
             </div>
             <p style="color: #666; margin-bottom: 15px;">Analyze the distribution of read lengths across your samples to ensure data quality.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'readLengthDistribution' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #f48fb1; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #a5d6a7; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
                         Read Length Distribution
                     </button>
                 </a>
             </div>
         </div>
 
-        <!-- Step 3: Gene Count Analysis - Teal buttons -->
-        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #4db8a8; border-radius: 8px; border: 1px solid #e0e0e0;">
+        <!-- Step 3: Gene Count Analysis - Pink buttons -->
+        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #f48fb1; border-radius: 8px; border: 1px solid #e0e0e0;">
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <div style="background-color: #4db8a8; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">3</div>
+                <div style="background-color: #f48fb1; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">3</div>
                 <h3 style="margin: 0; color: #333;">Gene Count Analysis</h3>
             </div>
             <p style="color: #666; margin-bottom: 15px;">Examine gene expression levels and compare between samples.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'geneCounts' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #4db8a8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #f48fb1; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
                         Gene Counts
                     </button>
                 </a>
                 <a href="{% url 'log2GeneCounts' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #4db8a8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #f48fb1; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
                         Gene Counts (Log₂)
                     </button>
                 </a>
             </div>
         </div>
 
-        <!-- Step 4: Advanced Analysis - Orange buttons -->
-        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #ffb74d; border-radius: 8px; border: 1px solid #e0e0e0;">
+        <!-- Step 4: Advanced Analysis - Light Purple buttons -->
+        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #ce93d8; border-radius: 8px; border: 1px solid #e0e0e0;">
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <div style="background-color: #ffb74d; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">4</div>
+                <div style="background-color: #ce93d8; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">4</div>
                 <h3 style="margin: 0; color: #333;">Advanced Analysis</h3>
             </div>
             <p style="color: #666; margin-bottom: 15px;">Perform deeper analysis including replicate comparisons and ribosome occupancy patterns.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'delta_analysis' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #ffb74d; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #ce93d8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
                         Delta Analysis
                     </button>
                 </a>
                 <a href="{% url 'binCounts' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #ffb74d; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #ce93d8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
                         Bin Counts
                     </button>
                 </a>
             </div>
         </div>
 
-        <!-- Step 5: Combined Analysis - Purple buttons -->
-        <div style="padding: 20px; background-color: white; border-left: 5px solid #9c27b0; border-radius: 8px; border: 1px solid #e0e0e0;">
+        <!-- Step 5: Combined Analysis - Teal buttons -->
+        <div style="padding: 20px; background-color: white; border-left: 5px solid #4db8a8; border-radius: 8px; border: 1px solid #e0e0e0;">
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <div style="background-color: #9c27b0; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">5</div>
+                <div style="background-color: #4db8a8; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">5</div>
                 <h3 style="margin: 0; color: #333;">Combined Analysis (Riboseq + mRNA)</h3>
             </div>
             <p style="color: #666; margin-bottom: 15px;">Compare ribosome profiling and mRNA-seq data together for integrated insights.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'combined_geneCounts' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #9c27b0; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #4db8a8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
                         Combined Gene Counts
                     </button>
                 </a>
                 <a href="{% url 'combined_pca_plot' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #9c27b0; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #4db8a8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
                         Combined PCA
                     </button>
                 </a>
