@@ -323,12 +323,12 @@ def get_gene_reads(gene_name):
 
     return pd.concat(all_data, ignore_index=True)
 def _cache_file_in_background(file_path, file_type):
-    """Background thread function to validate and cache file without blocking upload"""
+    """Background thread function to validate file without blocking upload"""
     try:
         import time
         time.sleep(2)  # Wait a bit to ensure file is fully written
 
-        # Validate file
+        # Validate file (just check schema, don't load entire file into memory)
         try:
             pq_file = pq.ParquetFile(file_path)
             columns = set(pq_file.schema.names)
@@ -349,11 +349,11 @@ def _cache_file_in_background(file_path, file_type):
                 os.remove(file_path)
             return
 
-        # File is valid, create cache
-        create_file_preprocessing_cache(file_path, file_type)
-        print(f"✅ Background caching completed for {os.path.basename(file_path)}")
+        # File is valid - don't create cache here to avoid OOM
+        # User can trigger preprocessing manually if needed
+        print(f"✅ File validation completed for {os.path.basename(file_path)}")
     except Exception as e:
-        print(f"❌ Error during background caching of {file_path}: {str(e)}")
+        print(f"❌ Error during file validation of {file_path}: {str(e)}")
 
 # Upload and store all Parquet data
 def upload_parquet(request):
