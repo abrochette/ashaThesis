@@ -22,14 +22,14 @@
             {% csrf_token %}
             <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: flex-end;">
                 <div>
-                    <label for="offset_csv" style="color: #333; font-weight: bold;">Select CSV File:</label>
+                    <label for="offset_csv" style="color: #333;">Select CSV File:</label>
                     <input type="file" name="offset_csv" id="offset_csv" accept=".csv"
                            style="margin-top: 5px; padding: 8px; width: 100%; border: 1px solid #ccc; border-radius: 4px;">
                     <small style="color: #666; display: block; margin-top: 5px;">
                         Format: Columns must be "Experiment", "Read Length", "P-site Offset"
                     </small>
                 </div>
-                <button type="submit" name="psite_offset_submit" class="btn btn-primary" style="padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; background-color: #81c784; color: white;">
+                <button type="submit" name="psite_offset_submit" class="btn btn-primary" style="padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; background-color: #81c784; color: white;">
                     Upload P-site Offsets
                 </button>
             </div>
@@ -59,7 +59,7 @@
                 <form method="post" enctype="multipart/form-data" class="form-group">
                     {% csrf_token %}
                     {{ bulk_mrna_form|crispy }}
-                    <button type="submit" name="bulk_mrna_submit" class="btn" style="background-color: #f48fb1; color: white; margin-top: 10px; width: 100%; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                    <button type="submit" name="bulk_mrna_submit" class="btn" style="background-color: #f48fb1; color: white; margin-top: 10px; width: 100%; border: none; border-radius: 4px; cursor: pointer;">
                         Upload mRNA Files
                     </button>
                 </form>
@@ -83,12 +83,12 @@
             <p style="color: #666; margin-bottom: 15px;">Start by examining the overall quality and relationships between your samples.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'pca_plot' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #81d4fa; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #81d4fa; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%;">
                         PCA Analysis
                     </button>
                 </a>
                 <a href="{% url 'psite_metagene' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #81d4fa; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #81d4fa; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%;">
                         P-site Metagene
                     </button>
                 </a>
@@ -104,7 +104,7 @@
             <p style="color: #666; margin-bottom: 15px;">Analyze the distribution of read lengths across your samples to ensure data quality.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'readLengthDistribution' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #a5d6a7; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #a5d6a7; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%;">
                         Read Length Distribution
                     </button>
                 </a>
@@ -120,12 +120,12 @@
             <p style="color: #666; margin-bottom: 15px;">Examine gene expression levels and compare between samples.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'geneCounts' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #f48fb1; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #f48fb1; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%;">
                         Gene Counts
                     </button>
                 </a>
                 <a href="{% url 'log2GeneCounts' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #f48fb1; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #f48fb1; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%;">
                         Gene Counts (Log₂)
                     </button>
                 </a>
@@ -141,12 +141,12 @@
             <p style="color: #666; margin-bottom: 15px;">Perform deeper analysis including replicate comparisons and ribosome occupancy patterns.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'delta_analysis' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #ce93d8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #ce93d8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%;">
                         Delta Analysis
                     </button>
                 </a>
                 <a href="{% url 'binCounts' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #ce93d8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #ce93d8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%;">
                         Bin Counts
                     </button>
                 </a>
@@ -162,12 +162,12 @@
             <p style="color: #666; margin-bottom: 15px;">Compare ribosome profiling and mRNA-seq data together for integrated insights.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'combined_geneCounts' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #4db8a8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #4db8a8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%;">
                         Combined Gene Counts
                     </button>
                 </a>
                 <a href="{% url 'combined_pca_plot' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #4db8a8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%; font-weight: bold;">
+                    <button style="padding: 12px 20px; background-color: #4db8a8; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%;">
                         Combined PCA
                     </button>
                 </a>
@@ -219,7 +219,7 @@
         </p>
         <form method="post" action="{% url 'clear_parquet_files' %}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete ALL parquet files and data? This cannot be undone!');">
             {% csrf_token %}
-            <button type="submit" class="btn btn-danger" style="background-color: #ffb74d; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: bold;">
+            <button type="submit" class="btn btn-danger" style="background-color: #ffb74d; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer;">
                 Clear All Files
             </button>
         </form>
