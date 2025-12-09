@@ -317,7 +317,7 @@ def get_gene_reads(gene_name):
         pq_file = pq.ParquetFile(file_path)
         for batch in pq_file.iter_batches(batch_size=100000, columns=["gene_name", "read_count"]):
             df_chunk = batch.to_pandas()
-            # Filter for the requested gene
+            # Filter for the requested gene using boolean indexing (faster than iterrows)
             filtered_df = df_chunk[df_chunk["gene_name"] == gene_name]
             if not filtered_df.empty:
                 all_data.append(filtered_df)

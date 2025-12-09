@@ -166,7 +166,7 @@ def get_total_read_count(filename, file_type="riboseq"):
 # ============================================================================
 
 def get_region_gene_counts(filename, file_type="riboseq"):
-    """Get gene counts by region from a parquet file - MEMORY EFFICIENT
+    """Get gene counts by region from a parquet file - MEMORY EFFICIENT & FAST
 
     Returns nested dictionary: {gene_name: {region: count}}
     """
@@ -187,12 +187,10 @@ def get_region_gene_counts(filename, file_type="riboseq"):
         for batch in pq_file.iter_batches(batch_size=100000, columns=["gene_name", "read_count", "region"]):
             df_chunk = batch.to_pandas()
 
-            # Accumulate counts by gene and region
-            for _, row in df_chunk.iterrows():
-                gene = row['gene_name']
-                region = row['region']
-                count = row['read_count']
+            # Use groupby instead of iterrows for speed
+            grouped = df_chunk.groupby(['gene_name', 'region'])['read_count'].sum()
 
+            for (gene, region), count in grouped.items():
                 if gene not in result:
                     result[gene] = {}
                 if region not in result[gene]:
