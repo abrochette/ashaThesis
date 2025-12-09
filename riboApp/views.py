@@ -372,10 +372,12 @@ def upload_parquet(request):
                 for file in files:
                     if file.name.endswith('.parquet'):
                         try:
+                            print(f"📥 Starting upload of {file.name} (size: {file.size} bytes)")
                             # Create UploadedParquet instance
                             uploaded_file = UploadedParquet(file=file)
                             uploaded_file.save()
                             file_path = uploaded_file.file.path
+                            print(f"✅ File saved to {file_path}")
 
                             # Skip validation during upload - validate in background thread
                             # This prevents timeout when uploading multiple large files
@@ -386,8 +388,10 @@ def upload_parquet(request):
                             )
                             cache_thread.start()
                             successful_uploads += 1
+                            print(f"✅ Background thread started for {file.name}")
 
                         except Exception as e:
+                            print(f"❌ Error uploading {file.name}: {str(e)}")
                             failed_uploads.append(f"{file.name}: {str(e)}")
                     else:
                         failed_uploads.append(f"{file.name}: not a .parquet file")
@@ -411,10 +415,12 @@ def upload_parquet(request):
                 for file in files:
                     if file.name.endswith('.parquet'):
                         try:
+                            print(f"📥 Starting upload of {file.name} (size: {file.size} bytes)")
                             # Create UploadedMrnaParquet instance
                             uploaded_file = UploadedMrnaParquet(file=file)
                             uploaded_file.save()
                             file_path = uploaded_file.file.path
+                            print(f"✅ File saved to {file_path}")
 
                             # Skip validation during upload - validate in background thread
                             # This prevents timeout when uploading multiple large files
@@ -425,8 +431,10 @@ def upload_parquet(request):
                             )
                             cache_thread.start()
                             successful_uploads += 1
+                            print(f"✅ Background thread started for {file.name}")
 
                         except Exception as e:
+                            print(f"❌ Error uploading {file.name}: {str(e)}")
                             failed_uploads.append(f"{file.name}: {str(e)}")
                     else:
                         failed_uploads.append(f"{file.name}: not a .parquet file")
