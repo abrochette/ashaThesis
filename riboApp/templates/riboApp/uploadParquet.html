@@ -18,13 +18,13 @@
         <p style="color: #666; margin-bottom: 12px; font-size: 0.95rem;">
             Upload your P-site offset CSV file (Format: "Experiment", "Read Length", "P-site Offset")
         </p>
-        <form method="post" enctype="multipart/form-data" class="form-group" style="display: flex; gap: 10px; align-items: flex-start; margin: 0;">
+        <form method="post" enctype="multipart/form-data" class="form-group" style="display: flex; gap: 10px; align-items: center; margin: 0;">
             {% csrf_token %}
             <div style="flex: 1;">
                 <input type="file" name="offset_csv" id="offset_csv" accept=".csv"
                        style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem;">
             </div>
-            <button type="submit" name="psite_offset_submit" class="btn btn-primary" style="padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; background-color: #000000; color: white; font-size: 0.9rem; white-space: nowrap; margin: 0;">
+            <button type="submit" name="psite_offset_submit" style="padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; background-color: #000000 !important; color: white !important; font-size: 0.9rem; white-space: nowrap; margin: 0; font-weight: normal !important;">
                 Upload
             </button>
         </form>
@@ -38,10 +38,10 @@
             <!-- Riboseq Upload -->
             <div>
                 <p style="color: #87CEFA; margin: 0 0 8px 0; font-size: 0.95rem; font-weight: 500;">Riboseq Files</p>
-                <form method="post" enctype="multipart/form-data" class="form-group" style="display: flex; gap: 8px; align-items: flex-start; margin: 0;">
+                <form method="post" enctype="multipart/form-data" class="form-group" style="display: flex; gap: 8px; align-items: center; margin: 0;">
                     {% csrf_token %}
                     {{ bulk_ribo_form|crispy }}
-                    <button type="submit" name="bulk_ribo_submit" class="btn btn-primary" style="padding: 10px 20px; background-color: #000000; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; flex-shrink: 0; height: fit-content; margin: 0;">
+                    <button type="submit" name="bulk_ribo_submit" style="padding: 10px 20px; background-color: #000000 !important; color: white !important; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; flex-shrink: 0; height: fit-content; margin: 0; font-weight: normal !important;">
                         Upload
                     </button>
                 </form>
@@ -50,10 +50,10 @@
             <!-- mRNA Upload -->
             <div>
                 <p style="color: #c2185b; margin: 0 0 8px 0; font-size: 0.95rem; font-weight: 500;">mRNA Files</p>
-                <form method="post" enctype="multipart/form-data" class="form-group" style="display: flex; gap: 8px; align-items: flex-start; margin: 0;">
+                <form method="post" enctype="multipart/form-data" class="form-group" style="display: flex; gap: 8px; align-items: center; margin: 0;">
                     {% csrf_token %}
                     {{ bulk_mrna_form|crispy }}
-                    <button type="submit" name="bulk_mrna_submit" class="btn" style="background-color: #000000; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; flex-shrink: 0; height: fit-content; margin: 0;">
+                    <button type="submit" name="bulk_mrna_submit" style="background-color: #000000 !important; color: white !important; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; flex-shrink: 0; height: fit-content; margin: 0; font-weight: normal !important;">
                         Upload
                     </button>
                 </form>
