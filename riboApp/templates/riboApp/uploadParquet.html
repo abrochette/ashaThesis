@@ -38,10 +38,10 @@
             <!-- Riboseq Upload -->
             <div>
                 <p style="color: #87CEFA; margin: 0 0 8px 0; font-size: 0.95rem; font-weight: 500;">Riboseq Files</p>
-                <form method="post" enctype="multipart/form-data" class="form-group" style="display: flex; gap: 8px; align-items: center;">
+                <form method="post" enctype="multipart/form-data" class="form-group" style="display: flex; gap: 8px; align-items: flex-start;">
                     {% csrf_token %}
                     {{ bulk_ribo_form|crispy }}
-                    <button type="submit" name="bulk_ribo_submit" class="btn btn-primary" style="padding: 10px 20px; background-color: #87CEFA; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; flex-shrink: 0; height: fit-content;">
+                    <button type="submit" name="bulk_ribo_submit" class="btn btn-primary" style="padding: 10px 20px; background-color: #87CEFA; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; flex-shrink: 0; height: fit-content; margin-top: 0;">
                         Upload
                     </button>
                 </form>
@@ -50,10 +50,10 @@
             <!-- mRNA Upload -->
             <div>
                 <p style="color: #c2185b; margin: 0 0 8px 0; font-size: 0.95rem; font-weight: 500;">mRNA Files</p>
-                <form method="post" enctype="multipart/form-data" class="form-group" style="display: flex; gap: 8px; align-items: center;">
+                <form method="post" enctype="multipart/form-data" class="form-group" style="display: flex; gap: 8px; align-items: flex-start;">
                     {% csrf_token %}
                     {{ bulk_mrna_form|crispy }}
-                    <button type="submit" name="bulk_mrna_submit" class="btn" style="background-color: #f48fb1; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; flex-shrink: 0; height: fit-content;">
+                    <button type="submit" name="bulk_mrna_submit" class="btn" style="background-color: #f48fb1; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; flex-shrink: 0; height: fit-content; margin-top: 0;">
                         Upload
                     </button>
                 </form>
@@ -68,21 +68,21 @@
         <h2 style="color: #333; margin-top: 0; text-align: center;">Recommended Analysis Flow</h2>
         <p style="text-align: center; color: #666; margin-bottom: 25px;">Follow this step-by-step guide for a comprehensive analysis of your data</p>
 
-        <!-- Step 1: Quality Control - Light Sky Blue buttons -->
-        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #87CEFA; border-radius: 8px; border: 1px solid #e0e0e0;">
+        <!-- Step 1: Quality Control - Muted Blue buttons -->
+        <div style="margin-bottom: 25px; padding: 20px; background-color: white; border-left: 5px solid #5B9BD5; border-radius: 8px; border: 1px solid #e0e0e0;">
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <div style="background-color: #87CEFA; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">1</div>
+                <div style="background-color: #5B9BD5; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">1</div>
                 <h3 style="margin: 0; color: #333;">Quality Control - Assess Data Quality</h3>
             </div>
             <p style="color: #666; margin-bottom: 15px;">Start by examining the overall quality and relationships between your samples.</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
                 <a href="{% url 'pca_plot' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #87CEFA; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%;">
+                    <button style="padding: 12px 20px; background-color: #5B9BD5; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%;">
                         PCA Analysis
                     </button>
                 </a>
                 <a href="{% url 'psite_metagene' %}" style="text-decoration: none;">
-                    <button style="padding: 12px 20px; background-color: #87CEFA; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%;">
+                    <button style="padding: 12px 20px; background-color: #5B9BD5; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.3s; width: 100%;">
                         P-site Metagene
                     </button>
                 </a>
