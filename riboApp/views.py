@@ -373,17 +373,36 @@ def upload_parquet(request):
                     if file.name.endswith('.parquet'):
                         try:
                             print(f"📥 Starting upload of {file.name} (size: {file.size} bytes)")
-                            # Create UploadedParquet instance
-                            uploaded_file = UploadedParquet(file=file)
+
+                            # Stream file to disk in chunks to avoid memory issues
+                            import os
+                            from django.core.files.storage import default_storage
+
+                            # Create the parquet files directory if it doesn't exist
+                            parquet_dir = "parquetFiles"
+                            os.makedirs(f"media/{parquet_dir}", exist_ok=True)
+
+                            # Write file in chunks (1MB at a time)
+                            file_path = f"{parquet_dir}/{file.name}"
+                            chunk_size = 1024 * 1024  # 1MB chunks
+
+                            with default_storage.open(file_path, 'wb') as destination:
+                                for chunk in file.chunks(chunk_size=chunk_size):
+                                    destination.write(chunk)
+
+                            print(f"✅ File streamed to {file_path}")
+
+                            # Create database record
+                            uploaded_file = UploadedParquet(file=file_path)
                             uploaded_file.save()
-                            file_path = uploaded_file.file.path
-                            print(f"✅ File saved to {file_path}")
+                            full_file_path = uploaded_file.file.path
+                            print(f"✅ Database record created for {file.name}")
 
                             # Skip validation during upload - validate in background thread
                             # This prevents timeout when uploading multiple large files
                             cache_thread = threading.Thread(
                                 target=_cache_file_in_background,
-                                args=(file_path, "riboseq"),
+                                args=(full_file_path, "riboseq"),
                                 daemon=True
                             )
                             cache_thread.start()
@@ -392,6 +411,8 @@ def upload_parquet(request):
 
                         except Exception as e:
                             print(f"❌ Error uploading {file.name}: {str(e)}")
+                            import traceback
+                            traceback.print_exc()
                             failed_uploads.append(f"{file.name}: {str(e)}")
                     else:
                         failed_uploads.append(f"{file.name}: not a .parquet file")
@@ -416,17 +437,36 @@ def upload_parquet(request):
                     if file.name.endswith('.parquet'):
                         try:
                             print(f"📥 Starting upload of {file.name} (size: {file.size} bytes)")
-                            # Create UploadedMrnaParquet instance
-                            uploaded_file = UploadedMrnaParquet(file=file)
+
+                            # Stream file to disk in chunks to avoid memory issues
+                            import os
+                            from django.core.files.storage import default_storage
+
+                            # Create the mRNA files directory if it doesn't exist
+                            mrna_dir = "mrnaFiles"
+                            os.makedirs(f"media/{mrna_dir}", exist_ok=True)
+
+                            # Write file in chunks (1MB at a time)
+                            file_path = f"{mrna_dir}/{file.name}"
+                            chunk_size = 1024 * 1024  # 1MB chunks
+
+                            with default_storage.open(file_path, 'wb') as destination:
+                                for chunk in file.chunks(chunk_size=chunk_size):
+                                    destination.write(chunk)
+
+                            print(f"✅ File streamed to {file_path}")
+
+                            # Create database record
+                            uploaded_file = UploadedMrnaParquet(file=file_path)
                             uploaded_file.save()
-                            file_path = uploaded_file.file.path
-                            print(f"✅ File saved to {file_path}")
+                            full_file_path = uploaded_file.file.path
+                            print(f"✅ Database record created for {file.name}")
 
                             # Skip validation during upload - validate in background thread
                             # This prevents timeout when uploading multiple large files
                             cache_thread = threading.Thread(
                                 target=_cache_file_in_background,
-                                args=(file_path, "mrna"),
+                                args=(full_file_path, "mrna"),
                                 daemon=True
                             )
                             cache_thread.start()
@@ -435,6 +475,8 @@ def upload_parquet(request):
 
                         except Exception as e:
                             print(f"❌ Error uploading {file.name}: {str(e)}")
+                            import traceback
+                            traceback.print_exc()
                             failed_uploads.append(f"{file.name}: {str(e)}")
                     else:
                         failed_uploads.append(f"{file.name}: not a .parquet file")
