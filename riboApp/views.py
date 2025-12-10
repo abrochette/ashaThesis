@@ -2174,12 +2174,8 @@ def create_stop_codon_comparison_plot(all_stop_data):
     return fig.to_html(full_html=False)
 
 
-# Use persistent storage location for GTF file on Elastic Beanstalk
-import os
-if os.environ.get('DJANGO_SETTINGS_MODULE'):
-    GTF_FILE = "/var/app/data/gencode.vM25.annotation.gtf"
-else:
-    GTF_FILE = "media/gencode.vM25.annotation.gtf"
+# GTF file path - use media folder which is deployed with the app
+GTF_FILE = "media/gencode.vM25.annotation.gtf"
 
 PARQUET_FOLDER = "media/parquetFiles/"          # Path where Parquet files are stored
 TRANSCRIPTS_FASTA = "media/gencode.vM25.transcripts.fa"  # Path to transcript sequences
