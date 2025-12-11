@@ -1,7 +1,6 @@
 #!/bin/bash
 # Download GTF file from S3 to /tmp at startup
 
-# GTF file details
 GTF_BUCKET="riboflow-gtf-files"
 GTF_KEY="gencode.vM25.annotation.gtf"
 GTF_LOCAL_PATH="/tmp/gencode.vM25.annotation.gtf"
@@ -18,7 +17,10 @@ if [ -f "$GTF_LOCAL_PATH" ] && [ -s "$GTF_LOCAL_PATH" ]; then
 fi
 
 echo "📥 Downloading GTF file from S3..."
-if aws s3 cp "s3://$GTF_BUCKET/$GTF_KEY" "$GTF_LOCAL_PATH" --region us-west-2 2>&1; then
+# Use public S3 URL to download
+S3_URL="https://${GTF_BUCKET}.s3.us-west-2.amazonaws.com/${GTF_KEY}"
+
+if curl -f -o "$GTF_LOCAL_PATH" "$S3_URL" 2>&1; then
     if [ -f "$GTF_LOCAL_PATH" ]; then
         FILE_SIZE=$(stat -f%z "$GTF_LOCAL_PATH" 2>/dev/null || stat -c%s "$GTF_LOCAL_PATH" 2>/dev/null)
         echo "✅ Downloaded GTF file ($(($FILE_SIZE / 1024 / 1024))MB)"
