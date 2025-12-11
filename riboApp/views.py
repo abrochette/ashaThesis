@@ -1653,95 +1653,77 @@ def generate_stop_codon_periodicity(selected_files):
 
 def process_metagene_data_no_shift(df, file_offsets, experiment_name, total_reads, site_type, selected_genes=None):
     """
-    EXACT copy of process_metagene_data but WITHOUT applying P-site offsets.
-    This is identical to the existing function except: df_filtered["p_site"] = df_filtered["start_position"]
+    Optimized version using vectorized operations instead of loops.
+    Generates metagene data WITHOUT applying P-site offsets.
     """
 
-    # Filter by selected genes if provided - EXACT same as original
+    # Filter by selected genes if provided
     if selected_genes:
         df = df[df["gene_name"].isin(selected_genes)]
         if df.empty:
             return pd.DataFrame()
 
-    # Create offset mapping - EXACT same as original
+    # Create offset mapping
     length_to_offset = dict(zip(file_offsets["read_length"], file_offsets["P_site_offset"]))
 
-    # Filter for read lengths 28-32 (typical ribosome footprint sizes) - EXACT same as original
+    # Filter for read lengths 28-32 (typical ribosome footprint sizes)
     df_filtered = df[df["read_length"].between(28, 32)].copy()
 
     if df_filtered.empty:
         return pd.DataFrame()
 
-    # Apply P-site offsets - THIS IS THE ONLY DIFFERENCE
+    # Apply P-site offsets - NO SHIFT for this analysis
     df_filtered["offset"] = df_filtered["read_length"].map(length_to_offset)
     df_filtered = df_filtered.dropna(subset=["offset"])
-    # ORIGINAL: df_filtered["p_site"] = df_filtered["start_position"] + df_filtered["offset"].astype(int)
-    # NO SHIFT: df_filtered["p_site"] = df_filtered["start_position"]  # NO OFFSET APPLIED
     df_filtered["p_site"] = df_filtered["start_position"]  # NO OFFSET APPLIED
 
-    metagene_data = []
+    # Filter genes with at least 10 reads
+    gene_read_counts = df_filtered.groupby("gene_name").size()
+    valid_genes = gene_read_counts[gene_read_counts >= 10].index
+    df_filtered = df_filtered[df_filtered["gene_name"].isin(valid_genes)]
 
-    # Group by gene to get start/stop positions - EXACT same as original
-    for gene_name, gene_df in df_filtered.groupby("gene_name"):
-        if len(gene_df) < 10:  # Skip genes with too few reads - EXACT same as original
-            continue
-
-        if site_type == "start":
-            # Use the minimum P-site position as the start codon reference - EXACT same as original
-            reference_pos = gene_df["p_site"].min()
-            # Look at positions from -30 to +62 relative to start - EXACT same as original
-            position_range = range(-30, 63)
-        else:  # stop - MODIFIED to show raw positions without P-site shifts
-            # For the unshifted version, we need to find the actual stop codon position
-            # Since we're not applying P-site shifts, we need to account for the fact that
-            # the raw read positions will be offset from the actual stop codon
-
-            # Find the end of the CDS region (this should be near the stop codon)
-            p_sites = gene_df["p_site"].sort_values()
-            # Use the 95th percentile as the reference, but adjust for the expected offset
-            raw_reference_pos = int(p_sites.quantile(0.95))
-
-            # Since we're not applying P-site shifts, the actual stop codon is likely
-            # to be at a position that's offset from where the reads are mapping
-            # For typical ribosome footprints, the P-site is usually ~12-15 nt from the 5' end
-            # So the stop codon should be ~12-15 nt downstream from the raw read positions
-            reference_pos = raw_reference_pos + 12  # Adjust reference to show raw offset pattern
-
-            # Look at positions from -10 to +30 relative to the adjusted reference
-            position_range = range(-10, 31)
-
-        # Calculate relative positions - EXACT same as original
-        gene_df = gene_df.copy()
-        gene_df["relative_position"] = gene_df["p_site"] - reference_pos
-
-        # Aggregate counts for each relative position - EXACT same as original
-        for pos in position_range:
-            pos_data = gene_df[gene_df["relative_position"] == pos]
-            count = pos_data["read_count"].sum()
-
-            if count > 0:  # Only include positions with reads - EXACT same as original
-                metagene_data.append({
-                    "experiment": experiment_name,
-                    "shifted_position": pos,
-                    "avg_count": (count / total_reads) * 1e6,  # Normalize to RPM - EXACT same as original
-                    "gene_name": gene_name
-                })
-
-    if not metagene_data:
+    if df_filtered.empty:
         return pd.DataFrame()
 
-    # Convert to DataFrame and aggregate across genes for each experiment - EXACT same as original
-    metagene_df = pd.DataFrame(metagene_data)
+    # Determine position range and reference positions based on site type
+    if site_type == "start":
+        position_range = range(-30, 63)
+        # Get minimum P-site position per gene (start codon reference)
+        reference_positions = df_filtered.groupby("gene_name")["p_site"].min()
+    else:  # stop
+        position_range = range(-10, 31)
+        # Use 95th percentile as reference, adjusted for expected offset
+        reference_positions = df_filtered.groupby("gene_name")["p_site"].quantile(0.95) + 12
 
+    # Vectorized calculation of relative positions
+    df_filtered["reference_pos"] = df_filtered["gene_name"].map(reference_positions)
+    df_filtered["relative_position"] = df_filtered["p_site"] - df_filtered["reference_pos"]
+
+    # Filter to only positions within our range
+    min_pos = min(position_range)
+    max_pos = max(position_range)
+    df_filtered = df_filtered[df_filtered["relative_position"].between(min_pos, max_pos)]
+
+    # Vectorized aggregation: group by relative position and gene, sum read counts
+    metagene_data = df_filtered.groupby(["relative_position", "gene_name"], as_index=False)["read_count"].sum()
+
+    # Normalize to RPM
+    metagene_data["avg_count"] = (metagene_data["read_count"] / total_reads) * 1e6
+    metagene_data["experiment"] = experiment_name
+    metagene_data = metagene_data[["experiment", "relative_position", "avg_count", "gene_name"]]
+    metagene_data.columns = ["experiment", "shifted_position", "avg_count", "gene_name"]
+
+    if metagene_data.empty:
+        return pd.DataFrame()
+
+    # Final aggregation across genes
     if selected_genes:
-        # When using selected genes, combine all genes into a single line per experiment - EXACT same as original
-        # Sum the counts across all selected genes for each position - EXACT same as original
-        result = metagene_df.groupby(["shifted_position", "experiment"], as_index=False)["avg_count"].sum()
-        # Add a label to indicate this is selected genes - EXACT same as original
+        # Sum the counts across all selected genes for each position
+        result = metagene_data.groupby(["shifted_position", "experiment"], as_index=False)["avg_count"].sum()
         result["experiment"] = result["experiment"] + " (Selected Genes)"
     else:
-        # Average across all genes for each position and experiment (original behavior) - EXACT same as original
-        result = metagene_df.groupby(["shifted_position", "experiment"], as_index=False)["avg_count"].mean()
+        # Sum across all genes for each position (consistent with other metagene functions)
+        result = metagene_data.groupby(["shifted_position", "experiment"], as_index=False)["avg_count"].sum()
 
     return result
 
