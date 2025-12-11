@@ -1,17 +1,17 @@
 #!/bin/bash
-# Set Gunicorn timeout to 3600 seconds (1 hour) for large file uploads
+# Set Gunicorn timeout to 7200 seconds (2 hours) for large file uploads and analysis
 
 # Create a gunicorn config file
 cat > /var/app/current/gunicorn_config.py << 'EOF'
 import multiprocessing
 
-workers = 3
+workers = 2
 worker_class = "sync"
-timeout = 3600
+timeout = 7200
 keepalive = 5
-max_requests = 1000
+max_requests = 500
 max_requests_jitter = 50
 EOF
 
-echo "✅ Gunicorn timeout set to 3600 seconds"
+echo "✅ Gunicorn timeout set to 7200 seconds with 2 workers"
 
