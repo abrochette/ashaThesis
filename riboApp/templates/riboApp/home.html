@@ -7,9 +7,9 @@
         <h1 style="color: #333; font-size: 2.8rem; margin-bottom: 15px; font-weight: bold;">RiboApp</h1>
         <p style="color: #666; font-size: 1.2rem; margin-bottom: 10px;">Comprehensive Ribosome Profiling Analysis Platform</p>
         <p style="color: #999; font-size: 1rem; max-width: 600px; margin: 0 auto 30px; line-height: 1.6;">
-            A powerful web application for analyzing ribosome profiling (Ribo-seq) data. Upload your processed parquet files and explore your data with interactive visualizations.
+            A powerful web application for analyzing ribosome profiling (Ribo-seq) data. Process raw FASTQ files, upload parquet files, and explore your data with interactive visualizations.
         </p>
-        <a href="/upload/" style="display: inline-block; padding: 14px 40px; background-color: #000000; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s;">
+        <a href="/preprocess/" style="display: inline-block; padding: 14px 40px; background-color: #000000; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s;">
             Get Started
         </a>
     </div>
@@ -18,37 +18,37 @@
     <div style="background-color: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 40px; margin-bottom: 60px;">
         <h2 style="color: #333; text-align: center; margin-bottom: 40px; font-size: 1.8rem; font-weight: bold;">Analysis Pipeline</h2>
 
-        <div style="display: flex; align-items: center; justify-content: center; gap: 15px; flex-wrap: wrap; max-width: 1000px; margin: 0 auto;">
-            <!-- Step 1: Upload -->
-            <div style="background-color: white; border-left: 5px solid #5B9BD5; border: 1px solid #e0e0e0; border-radius: 6px; padding: 20px; text-align: center; min-width: 140px; flex: 1; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
-                <div style="font-size: 2rem; margin-bottom: 10px;">📤</div>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 15px; flex-wrap: wrap; max-width: 1200px; margin: 0 auto;">
+            <!-- Step 1: Preprocessing -->
+            <div style="background-color: white; border-left: 5px solid #5B9BD5; border: 1px solid #e0e0e0; border-radius: 6px; padding: 20px; text-align: center; min-width: 120px; flex: 1; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
+                <div style="font-size: 2rem; margin-bottom: 10px;">⚙️</div>
+                <h3 style="color: #333; margin: 0 0 8px 0; font-size: 1rem; font-weight: 600;">Preprocess</h3>
+                <p style="color: #666; margin: 0; font-size: 0.9rem;">FASTQ → Parquet</p>
+            </div>
+
+            <div style="color: #5B9BD5; font-size: 1.5rem; font-weight: bold;">→</div>
+
+            <!-- Step 2: Upload -->
+            <div style="background-color: white; border-left: 5px solid #a5d6a7; border: 1px solid #e0e0e0; border-radius: 6px; padding: 20px; text-align: center; min-width: 120px; flex: 1; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
+                <div style="font-size: 2rem; margin-bottom: 10px;">�</div>
                 <h3 style="color: #333; margin: 0 0 8px 0; font-size: 1rem; font-weight: 600;">Upload</h3>
                 <p style="color: #666; margin: 0; font-size: 0.9rem;">Parquet Files</p>
             </div>
 
             <div style="color: #5B9BD5; font-size: 1.5rem; font-weight: bold;">→</div>
 
-            <!-- Step 2: P-site Adjustment -->
-            <div style="background-color: white; border-left: 5px solid #a5d6a7; border: 1px solid #e0e0e0; border-radius: 6px; padding: 20px; text-align: center; min-width: 140px; flex: 1; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
-                <div style="font-size: 2rem; margin-bottom: 10px;">🔧</div>
-                <h3 style="color: #333; margin: 0 0 8px 0; font-size: 1rem; font-weight: 600;">P-site Adjust</h3>
+            <!-- Step 3: P-site Adjustment -->
+            <div style="background-color: white; border-left: 5px solid #f48fb1; border: 1px solid #e0e0e0; border-radius: 6px; padding: 20px; text-align: center; min-width: 120px; flex: 1; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
+                <div style="font-size: 2rem; margin-bottom: 10px;">�</div>
+                <h3 style="color: #333; margin: 0 0 8px 0; font-size: 1rem; font-weight: 600;">P-site</h3>
                 <p style="color: #666; margin: 0; font-size: 0.9rem;">Offset Config</p>
             </div>
 
             <div style="color: #5B9BD5; font-size: 1.5rem; font-weight: bold;">→</div>
 
-            <!-- Step 3: Quality Control -->
-            <div style="background-color: white; border-left: 5px solid #f48fb1; border: 1px solid #e0e0e0; border-radius: 6px; padding: 20px; text-align: center; min-width: 140px; flex: 1; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
-                <div style="font-size: 2rem; margin-bottom: 10px;">📊</div>
-                <h3 style="color: #333; margin: 0 0 8px 0; font-size: 1rem; font-weight: 600;">Quality Check</h3>
-                <p style="color: #666; margin: 0; font-size: 0.9rem;">PCA & Metrics</p>
-            </div>
-
-            <div style="color: #5B9BD5; font-size: 1.5rem; font-weight: bold;">→</div>
-
             <!-- Step 4: Analysis -->
-            <div style="background-color: white; border-left: 5px solid #ce93d8; border: 1px solid #e0e0e0; border-radius: 6px; padding: 20px; text-align: center; min-width: 140px; flex: 1; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
-                <div style="font-size: 2rem; margin-bottom: 10px;">🔬</div>
+            <div style="background-color: white; border-left: 5px solid #ce93d8; border: 1px solid #e0e0e0; border-radius: 6px; padding: 20px; text-align: center; min-width: 120px; flex: 1; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
+                <div style="font-size: 2rem; margin-bottom: 10px;">�</div>
                 <h3 style="color: #333; margin: 0 0 8px 0; font-size: 1rem; font-weight: 600;">Analysis</h3>
                 <p style="color: #666; margin: 0; font-size: 0.9rem;">Visualizations</p>
             </div>
@@ -59,50 +59,44 @@
     <div style="margin-bottom: 60px;">
         <h2 style="color: #333; text-align: center; margin-bottom: 40px; font-size: 1.8rem; font-weight: bold;">Quick Navigation</h2>
 
-        <!-- Step 1: Upload -->
+        <!-- Step 1: Preprocessing -->
         <div style="margin-bottom: 30px; padding: 25px; background-color: white; border-left: 5px solid #5B9BD5; border: 1px solid #e0e0e0; border-radius: 8px;">
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
                 <div style="background-color: #5B9BD5; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">1</div>
+                <h3 style="margin: 0; color: #333; font-size: 1.3rem;">Preprocessing</h3>
+            </div>
+            <p style="color: #666; margin-bottom: 15px; margin-left: 55px;">Convert raw FASTQ files into processed parquet files for analysis.</p>
+            <div style="margin-left: 55px;">
+                <a href="/preprocess/" style="display: inline-block; padding: 10px 24px; background-color: #5B9BD5; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s;">
+                    Go to Preprocessing
+                </a>
+            </div>
+        </div>
+
+        <!-- Step 2: Upload -->
+        <div style="margin-bottom: 30px; padding: 25px; background-color: white; border-left: 5px solid #a5d6a7; border: 1px solid #e0e0e0; border-radius: 8px;">
+            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                <div style="background-color: #a5d6a7; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">2</div>
                 <h3 style="margin: 0; color: #333; font-size: 1.3rem;">Upload Data Files</h3>
             </div>
             <p style="color: #666; margin-bottom: 15px; margin-left: 55px;">Upload your processed parquet files (Riboseq and mRNA) to begin analysis.</p>
             <div style="margin-left: 55px;">
-                <a href="/upload/" style="display: inline-block; padding: 10px 24px; background-color: #5B9BD5; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s;">
+                <a href="/upload/" style="display: inline-block; padding: 10px 24px; background-color: #a5d6a7; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s;">
                     Go to Upload
                 </a>
             </div>
         </div>
 
-        <!-- Step 2: P-site Adjustment -->
-        <div style="margin-bottom: 30px; padding: 25px; background-color: white; border-left: 5px solid #a5d6a7; border: 1px solid #e0e0e0; border-radius: 8px;">
+        <!-- Step 3: P-site Adjustment -->
+        <div style="margin-bottom: 30px; padding: 25px; background-color: white; border-left: 5px solid #f48fb1; border: 1px solid #e0e0e0; border-radius: 8px;">
             <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <div style="background-color: #a5d6a7; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">2</div>
+                <div style="background-color: #f48fb1; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">3</div>
                 <h3 style="margin: 0; color: #333; font-size: 1.3rem;">Configure P-site Offsets</h3>
             </div>
             <p style="color: #666; margin-bottom: 15px; margin-left: 55px;">Upload P-site offset CSV file or manually configure offsets for your experiments.</p>
             <div style="margin-left: 55px;">
-                <a href="/psiteOffset/" style="display: inline-block; padding: 10px 24px; background-color: #a5d6a7; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s;">
+                <a href="/psiteOffset/" style="display: inline-block; padding: 10px 24px; background-color: #f48fb1; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s;">
                     Configure P-sites
-                </a>
-            </div>
-        </div>
-
-        <!-- Step 3: Quality Control -->
-        <div style="margin-bottom: 30px; padding: 25px; background-color: white; border-left: 5px solid #f48fb1; border: 1px solid #e0e0e0; border-radius: 8px;">
-            <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <div style="background-color: #f48fb1; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">3</div>
-                <h3 style="margin: 0; color: #333; font-size: 1.3rem;">Quality Control & Assessment</h3>
-            </div>
-            <p style="color: #666; margin-bottom: 15px; margin-left: 55px;">Assess data quality with PCA analysis, read length distributions, and P-site metagene plots.</p>
-            <div style="margin-left: 55px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
-                <a href="/pca_plot/" style="display: inline-block; padding: 10px 20px; background-color: #f48fb1; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s; text-align: center;">
-                    PCA Analysis
-                </a>
-                <a href="/readLengthDistribution/" style="display: inline-block; padding: 10px 20px; background-color: #f48fb1; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s; text-align: center;">
-                    Read Lengths
-                </a>
-                <a href="/psite_metagene/" style="display: inline-block; padding: 10px 20px; background-color: #f48fb1; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s; text-align: center;">
-                    P-site Metagene
                 </a>
             </div>
         </div>
@@ -113,8 +107,17 @@
                 <div style="background-color: #ce93d8; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; margin-right: 15px;">4</div>
                 <h3 style="margin: 0; color: #333; font-size: 1.3rem;">Advanced Analysis</h3>
             </div>
-            <p style="color: #666; margin-bottom: 15px; margin-left: 55px;">Explore your data with comprehensive analysis tools including gene counts, bin analysis, and more.</p>
+            <p style="color: #666; margin-bottom: 15px; margin-left: 55px;">Explore your data with comprehensive analysis tools including quality control, gene counts, bin analysis, and more.</p>
             <div style="margin-left: 55px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                <a href="/pca_plot/" style="display: inline-block; padding: 10px 20px; background-color: #ce93d8; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s; text-align: center;">
+                    PCA Analysis
+                </a>
+                <a href="/readLengthDistribution/" style="display: inline-block; padding: 10px 20px; background-color: #ce93d8; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s; text-align: center;">
+                    Read Lengths
+                </a>
+                <a href="/psite_metagene/" style="display: inline-block; padding: 10px 20px; background-color: #ce93d8; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s; text-align: center;">
+                    P-site Metagene
+                </a>
                 <a href="/geneCounts/" style="display: inline-block; padding: 10px 20px; background-color: #ce93d8; color: white; text-decoration: none; border-radius: 6px; font-weight: 500; transition: all 0.3s; text-align: center;">
                     Gene Counts
                 </a>
