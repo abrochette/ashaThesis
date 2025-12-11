@@ -1089,18 +1089,20 @@ def get_bin_counts(selected_file):
 
     length_to_offset = dict(zip(offsets_df["Read Length"], offsets_df["P-site Offset"]))
 
-    # 🚀 Try to use cached region stats first
-    cached_stats = get_cached_region_stats(selected_file)
-    if not cached_stats.empty:
-        print(f"🚀 Using cached region stats for bin counts: {selected_file}")
-        # For bin counts, we still need the full data with positions, so fall back to file reading
-        # This optimization would require more complex caching of position data
-        file_path = os.path.join(PARQUET_FOLDER, selected_file)
-        df = pq.read_table(file_path, columns=["gene_name", "read_length", "start_position"]).to_pandas()
+    # Read parquet file in chunks to avoid OOM
+    print(f"Reading parquet file in chunks: {selected_file}")
+    file_path = os.path.join(PARQUET_FOLDER, selected_file)
+    all_chunks = []
+    pq_file = pq.ParquetFile(file_path)
+
+    for batch in pq_file.iter_batches(batch_size=100000, columns=["gene_name", "read_length", "start_position"]):
+        chunk = batch.to_pandas()
+        all_chunks.append(chunk)
+
+    if all_chunks:
+        df = pd.concat(all_chunks, ignore_index=True)
     else:
-        print(f"⚠️ Cache miss for bin counts, reading file: {selected_file}")
-        file_path = os.path.join(PARQUET_FOLDER, selected_file)
-        df = pq.read_table(file_path, columns=["gene_name", "read_length", "start_position"]).to_pandas()
+        df = pd.DataFrame()
 
     df = df.query("gene_name in @selected_genes")
 
