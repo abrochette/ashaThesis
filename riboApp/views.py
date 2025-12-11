@@ -3212,14 +3212,24 @@ def generate_psite_metagene_plots(selected_files, selected_genes=None):
         df = get_cached_psite_data(file)
 
         if df.empty:
-            print(f"⚠️ P-site cache miss for {file}, reading parquet file...")
-            # Fallback: Read parquet file
-            df = pq.read_table(file_path, columns=[
-                "gene_name", "start_position", "end_position", "read_length", "read_count", "region"
-            ]).to_pandas()
+            print(f"⚠️ P-site cache miss for {file}, reading parquet file in chunks...")
+            # Read parquet file in chunks to avoid OOM
+            all_chunks = []
+            pq_file = pq.ParquetFile(file_path)
 
-            # Filter for CDS regions only (where ribosomes should be)
-            df = df[df["region"] == "CDS"]
+            for batch in pq_file.iter_batches(batch_size=100000, columns=[
+                "gene_name", "start_position", "end_position", "read_length", "read_count", "region"
+            ]):
+                chunk = batch.to_pandas()
+                # Filter for CDS regions only
+                chunk = chunk[chunk["region"] == "CDS"]
+                if not chunk.empty:
+                    all_chunks.append(chunk)
+
+            if all_chunks:
+                df = pd.concat(all_chunks, ignore_index=True)
+            else:
+                df = pd.DataFrame()
         else:
             print(f"⚡ Using cached P-site data for {file}")
 
@@ -3239,6 +3249,11 @@ def generate_psite_metagene_plots(selected_files, selected_genes=None):
             all_start_data.append(start_data)
         if not stop_data.empty:
             all_stop_data.append(stop_data)
+
+        # Clear memory after processing each file
+        del df
+        import gc
+        gc.collect()
 
     if not all_start_data and not all_stop_data:
         raise ValueError("No valid data found for selected files")
@@ -3311,17 +3326,16 @@ def process_metagene_data_both_sites(df, file_offsets, experiment_name, total_re
     if df_filtered.empty:
         return pd.DataFrame(), pd.DataFrame()
 
-    # 🚀 PROCESS START CODON DATA - VECTORIZED
+    # 🚀 PROCESS START CODON DATA - VECTORIZED (NO COPY)
     start_position_range = range(-30, 63)
-    df_start = df_filtered.copy()
     # Use vectorized map instead of apply
-    df_start["reference_pos"] = df_start["gene_name"].map(start_reference_positions)
-    df_start["relative_position"] = df_start["p_site"] - df_start["reference_pos"]
+    df_filtered["reference_pos"] = df_filtered["gene_name"].map(start_reference_positions)
+    df_filtered["relative_position"] = df_filtered["p_site"] - df_filtered["reference_pos"]
 
     # Filter to valid range
     min_start = min(start_position_range)
     max_start = max(start_position_range)
-    df_start = df_start[df_start["relative_position"].between(min_start, max_start)]
+    df_start = df_filtered[df_filtered["relative_position"].between(min_start, max_start)]
 
     # Vectorized aggregation
     start_position_counts = df_start.groupby("relative_position")["read_count"].sum()
@@ -3331,18 +3345,17 @@ def process_metagene_data_both_sites(df, file_offsets, experiment_name, total_re
         "experiment": experiment_name
     })
 
-    # 🚀 PROCESS STOP CODON DATA - VECTORIZED
+    # 🚀 PROCESS STOP CODON DATA - VECTORIZED (NO COPY)
     stop_position_range = range(-10, 31)
-    df_stop = df_filtered.copy()
     # Use vectorized map instead of apply
-    df_stop["reference_pos"] = df_stop["gene_name"].map(stop_reference_positions)
+    df_filtered["reference_pos"] = df_filtered["gene_name"].map(stop_reference_positions)
     # For stop codon: calculate relative position as (stop_position - p_site)
-    df_stop["relative_position"] = df_stop["reference_pos"] - df_stop["p_site"]
+    df_filtered["relative_position"] = df_filtered["reference_pos"] - df_filtered["p_site"]
 
     # Filter to valid range
     min_stop = min(stop_position_range)
     max_stop = max(stop_position_range)
-    df_stop = df_stop[df_stop["relative_position"].between(min_stop, max_stop)]
+    df_stop = df_filtered[df_filtered["relative_position"].between(min_stop, max_stop)]
 
     # Vectorized aggregation
     stop_position_counts = df_stop.groupby("relative_position")["read_count"].sum()
