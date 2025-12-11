@@ -3311,49 +3311,48 @@ def process_metagene_data_both_sites(df, file_offsets, experiment_name, total_re
     if df_filtered.empty:
         return pd.DataFrame(), pd.DataFrame()
 
-    # 🚀 PROCESS START CODON DATA
+    # 🚀 PROCESS START CODON DATA - VECTORIZED
     start_position_range = range(-30, 63)
     df_start = df_filtered.copy()
-    df_start["relative_position"] = df_start.apply(
-        lambda row: row["p_site"] - start_reference_positions[row["gene_name"]], axis=1
-    )
-    df_start = df_start[df_start["relative_position"].isin(start_position_range)]
+    # Use vectorized map instead of apply
+    df_start["reference_pos"] = df_start["gene_name"].map(start_reference_positions)
+    df_start["relative_position"] = df_start["p_site"] - df_start["reference_pos"]
+
+    # Filter to valid range
+    min_start = min(start_position_range)
+    max_start = max(start_position_range)
+    df_start = df_start[df_start["relative_position"].between(min_start, max_start)]
+
+    # Vectorized aggregation
     start_position_counts = df_start.groupby("relative_position")["read_count"].sum()
+    start_metagene_data = pd.DataFrame({
+        "shifted_position": start_position_counts.index,
+        "avg_count": (start_position_counts.values / total_reads) * 1e6,
+        "experiment": experiment_name
+    })
 
-    start_metagene_data = []
-    for pos, count in start_position_counts.items():
-        if count > 0:
-            start_metagene_data.append({
-                "experiment": experiment_name,
-                "shifted_position": pos,
-                "avg_count": (count / total_reads) * 1e6,  # Normalize to RPM
-            })
-
-    start_metagene_df = pd.DataFrame(start_metagene_data) if start_metagene_data else pd.DataFrame()
-
-    # 🚀 PROCESS STOP CODON DATA
+    # 🚀 PROCESS STOP CODON DATA - VECTORIZED
     stop_position_range = range(-10, 31)
     df_stop = df_filtered.copy()
+    # Use vectorized map instead of apply
+    df_stop["reference_pos"] = df_stop["gene_name"].map(stop_reference_positions)
     # For stop codon: calculate relative position as (stop_position - p_site)
-    # This gives negative values upstream and positive values downstream of stop
-    df_stop["relative_position"] = df_stop.apply(
-        lambda row: stop_reference_positions[row["gene_name"]] - row["p_site"], axis=1
-    )
-    df_stop = df_stop[df_stop["relative_position"].isin(stop_position_range)]
+    df_stop["relative_position"] = df_stop["reference_pos"] - df_stop["p_site"]
+
+    # Filter to valid range
+    min_stop = min(stop_position_range)
+    max_stop = max(stop_position_range)
+    df_stop = df_stop[df_stop["relative_position"].between(min_stop, max_stop)]
+
+    # Vectorized aggregation
     stop_position_counts = df_stop.groupby("relative_position")["read_count"].sum()
+    stop_metagene_data = pd.DataFrame({
+        "shifted_position": stop_position_counts.index,
+        "avg_count": (stop_position_counts.values / total_reads) * 1e6,
+        "experiment": experiment_name
+    })
 
-    stop_metagene_data = []
-    for pos, count in stop_position_counts.items():
-        if count > 0:
-            stop_metagene_data.append({
-                "experiment": experiment_name,
-                "shifted_position": pos,
-                "avg_count": (count / total_reads) * 1e6,  # Normalize to RPM
-            })
-
-    stop_metagene_df = pd.DataFrame(stop_metagene_data) if stop_metagene_data else pd.DataFrame()
-
-    return start_metagene_df, stop_metagene_df
+    return start_metagene_data, stop_metagene_data
 
 
 def process_metagene_data(df, file_offsets, experiment_name, total_reads, site_type, selected_genes=None):
