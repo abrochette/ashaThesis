@@ -10,7 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 import re
 import threading
-# from sklearn.decomposition import PCA  # Temporarily disabled - scipy/sklearn too heavy for free tier
+from sklearn.decomposition import PCA
 import glob
 import numpy as np
 # import matplotlib.pyplot as plt  # Temporarily disabled - too heavy for free tier
