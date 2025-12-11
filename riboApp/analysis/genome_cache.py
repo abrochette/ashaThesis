@@ -19,10 +19,8 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Try to use GTF file from S3 download location first (/tmp on AWS), then fall back to media folder
-_GTF_FILE_S3 = Path("/tmp/gencode.vM25.annotation.gtf")
-_GTF_FILE_LOCAL = BASE_DIR / "media" / "gencode.vM25.annotation.gtf"
-GTF_FILE = _GTF_FILE_S3 if _GTF_FILE_S3.exists() else _GTF_FILE_LOCAL
+# GTF file location - should be in media folder (downloaded by postdeploy hook)
+GTF_FILE = BASE_DIR / "media" / "gencode.vM25.annotation.gtf"
 
 FASTA_FILE = BASE_DIR / "media" / "gencode.vM25.transcripts.fa"
 CACHE_DIR = BASE_DIR / "media" / ".genome_cache"
