@@ -1121,6 +1121,8 @@ def get_bin_counts(selected_file):
     # List to collect normalized bin counts across all genes
     combined_fractions = []
 
+    import gc
+
     for gene_name in selected_genes:
         df_gene = df.query("gene_name == @gene_name")
 
@@ -1166,11 +1168,18 @@ def get_bin_counts(selected_file):
         fig.update_traces(marker=dict(color=bin_colors[:len(bin_counts)]))
         plot_html += fig.to_html(full_html=False)
 
+        # Explicitly delete figure to free memory
+        del fig
+
         # Normalize bin counts for this gene (turn into fractions)
         total_reads = bin_counts.sum()
         if total_reads > 0:
             bin_fractions = bin_counts / total_reads
             combined_fractions.append(bin_fractions.values)
+
+        # Periodically collect garbage to prevent memory buildup
+        if len(combined_fractions) % 10 == 0:
+            gc.collect()
 
     # After processing all genes, make a combined average fraction plot
     if combined_fractions:
@@ -2433,12 +2442,19 @@ def process_parquet_file_gene_counts(file_path):
         print(f"🚀 Using cached gene counts for PCA: {filename}")
         return cached_counts
 
-    # Fallback to file reading if cache miss
-    print(f"⚠️ Cache miss for PCA, reading file: {filename}")
-    df = pd.read_parquet(file_path)
-    if "gene_name" not in df.columns or "read_count" not in df.columns:
-        raise ValueError(f"Missing required columns in {file_path}")
-    gene_counts = df.groupby("gene_name", as_index=False)["read_count"].sum()
+    # Fallback to file reading if cache miss - READ IN CHUNKS to avoid OOM
+    print(f"⚠️ Cache miss for PCA, reading file in chunks: {filename}")
+    gene_counts_dict = {}
+    pq_file = pq.ParquetFile(file_path)
+
+    for batch in pq_file.iter_batches(batch_size=100000, columns=["gene_name", "read_count"]):
+        df_chunk = batch.to_pandas()
+        batch_counts = df_chunk.groupby("gene_name")["read_count"].sum()
+        for gene, count in batch_counts.items():
+            gene_counts_dict[gene] = gene_counts_dict.get(gene, 0) + count
+
+    # Convert dict to DataFrame
+    gene_counts = pd.DataFrame(list(gene_counts_dict.items()), columns=["gene_name", "read_count"])
     gene_counts["file_name"] = filename
     return gene_counts
 
@@ -2455,12 +2471,19 @@ def process_mrna_file_gene_counts(file_path):
         print(f"🚀 Using cached mRNA gene counts for PCA: {filename}")
         return cached_counts
 
-    # Fallback to file reading if cache miss
-    print(f"⚠️ Cache miss for mRNA PCA, reading file: {filename}")
-    df = pd.read_parquet(file_path)
-    if "gene_name" not in df.columns or "read_count" not in df.columns:
-        raise ValueError(f"Missing required columns in {file_path}")
-    gene_counts = df.groupby("gene_name", as_index=False)["read_count"].sum()
+    # Fallback to file reading if cache miss - READ IN CHUNKS to avoid OOM
+    print(f"⚠️ Cache miss for mRNA PCA, reading file in chunks: {filename}")
+    gene_counts_dict = {}
+    pq_file = pq.ParquetFile(file_path)
+
+    for batch in pq_file.iter_batches(batch_size=100000, columns=["gene_name", "read_count"]):
+        df_chunk = batch.to_pandas()
+        batch_counts = df_chunk.groupby("gene_name")["read_count"].sum()
+        for gene, count in batch_counts.items():
+            gene_counts_dict[gene] = gene_counts_dict.get(gene, 0) + count
+
+    # Convert dict to DataFrame
+    gene_counts = pd.DataFrame(list(gene_counts_dict.items()), columns=["gene_name", "read_count"])
     gene_counts["file_name"] = f"mRNA_{filename}"
     return gene_counts
 
@@ -3302,7 +3325,7 @@ def process_metagene_data_both_sites(df, file_offsets, experiment_name, total_re
     length_to_offset = dict(zip(file_offsets["read_length"], file_offsets["P_site_offset"]))
 
     # Filter for read lengths 28-32 (typical ribosome footprint sizes)
-    df_filtered = df[df["read_length"].between(28, 32)].copy()
+    df_filtered = df[df["read_length"].between(28, 32)]
 
     if df_filtered.empty:
         return pd.DataFrame(), pd.DataFrame()
@@ -3321,7 +3344,7 @@ def process_metagene_data_both_sites(df, file_offsets, experiment_name, total_re
     gene_read_counts = df_filtered.groupby("gene_name").size()
     valid_genes = gene_read_counts[gene_read_counts >= 10].index
 
-    df_filtered = df_filtered[df_filtered["gene_name"].isin(valid_genes)].copy()
+    df_filtered = df_filtered[df_filtered["gene_name"].isin(valid_genes)]
     start_reference_positions = start_reference_positions[valid_genes]
     stop_reference_positions = stop_reference_positions[valid_genes]
 
