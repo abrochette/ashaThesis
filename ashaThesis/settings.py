@@ -98,11 +98,8 @@ WSGI_APPLICATION = "ashaThesis.wsgi.application"
 
 import os
 
-# Use persistent database location on Elastic Beanstalk
-if os.environ.get('DJANGO_SETTINGS_MODULE'):
-    db_path = '/var/app/data/db.sqlite3'
-else:
-    db_path = BASE_DIR / "db.sqlite3"
+# Use writable database location
+db_path = BASE_DIR / "db.sqlite3"
 
 DATABASES = {
     "default": {
@@ -161,6 +158,6 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
-        'LOCATION': '/var/app/data/django_cache',  # Use persistent directory on Elastic Beanstalk
+        'LOCATION': os.path.join(BASE_DIR, 'media', '.django_cache'),
     }
 }
