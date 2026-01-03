@@ -46,27 +46,33 @@ _PSITE_OFFSETS_CACHE_TIMESTAMP = None
 # FILE LISTING AND AVAILABILITY
 # ============================================================================
 
-def get_available_parquet_files():
-    """Get list of available parquet files"""
-    parquet_files, _ = get_cached_available_files()
+def get_available_parquet_files(user=None):
+    """Get list of available parquet files for a specific user"""
+    parquet_files, _ = get_cached_available_files(user=user)
     return parquet_files
 
 
-def get_available_mrna_parquet_files():
-    """Get list of available mRNA parquet files"""
-    _, mrna_files = get_cached_available_files()
+def get_available_mrna_parquet_files(user=None):
+    """Get list of available mRNA parquet files for a specific user"""
+    _, mrna_files = get_cached_available_files(user=user)
     return mrna_files
 
 
-def get_cached_available_files():
-    """Get available files from global cache or scan if needed"""
+def get_cached_available_files(user=None):
+    """Get available files from global cache or scan if needed
+
+    If user is provided, only returns files uploaded by that user.
+    If user is None, returns all files (for backward compatibility).
+    """
     global _AVAILABLE_FILES_CACHE, _AVAILABLE_FILES_CACHE_TIMESTAMP
 
     import time
+
     current_time = time.time()
 
-    # Check cache
-    if (_AVAILABLE_FILES_CACHE is not None and
+    # Check cache (only if no user filter)
+    if (user is None and
+        _AVAILABLE_FILES_CACHE is not None and
         _AVAILABLE_FILES_CACHE_TIMESTAMP is not None and
         current_time - _AVAILABLE_FILES_CACHE_TIMESTAMP < CACHE_TIMEOUT):
         print("🚀 Using cached file lists")
@@ -77,14 +83,28 @@ def get_cached_available_files():
     parquet_files = []
     mrna_files = []
 
-    if os.path.exists(PARQUET_FOLDER):
-        parquet_files = sorted([f for f in os.listdir(PARQUET_FOLDER) if f.endswith(".parquet")])
+    # If user is provided, scan user-specific folders
+    if user is not None:
+        from ..user_utils import get_user_parquet_folder, get_user_mrna_folder
+        user_parquet_folder = get_user_parquet_folder(user)
+        user_mrna_folder = get_user_mrna_folder(user)
 
-    if os.path.exists(MRNA_FOLDER):
-        mrna_files = sorted([f for f in os.listdir(MRNA_FOLDER) if f.endswith(".parquet")])
+        if os.path.exists(user_parquet_folder):
+            parquet_files = sorted([f for f in os.listdir(user_parquet_folder) if f.endswith(".parquet")])
 
-    _AVAILABLE_FILES_CACHE = (parquet_files, mrna_files)
-    _AVAILABLE_FILES_CACHE_TIMESTAMP = current_time
+        if os.path.exists(user_mrna_folder):
+            mrna_files = sorted([f for f in os.listdir(user_mrna_folder) if f.endswith(".parquet")])
+    else:
+        # Scan global directories (backward compatibility)
+        if os.path.exists(PARQUET_FOLDER):
+            parquet_files = sorted([f for f in os.listdir(PARQUET_FOLDER) if f.endswith(".parquet")])
+
+        if os.path.exists(MRNA_FOLDER):
+            mrna_files = sorted([f for f in os.listdir(MRNA_FOLDER) if f.endswith(".parquet")])
+
+    if user is None:
+        _AVAILABLE_FILES_CACHE = (parquet_files, mrna_files)
+        _AVAILABLE_FILES_CACHE_TIMESTAMP = current_time
 
     print(f"💾 Found {len(parquet_files)} parquet files and {len(mrna_files)} mRNA files")
     return parquet_files, mrna_files
