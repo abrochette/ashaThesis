@@ -35,8 +35,40 @@ from django.core.files.storage import default_storage
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
-from .user_utils import get_user_parquet_folder, get_user_mrna_folder, ensure_user_folders
+from .user_utils import (
+    get_user_parquet_folder,
+    get_user_mrna_folder,
+    get_user_pickle_folder,
+    get_user_mrna_pickle_folder,
+    ensure_user_folders
+)
 
+
+# ============================================================================
+# HELPER FUNCTIONS FOR USER-SPECIFIC DATA ACCESS
+# ============================================================================
+
+def get_user_parquet_files(user):
+    """Get parquet files for a specific user"""
+    from .analysis.data_getters import get_available_parquet_files
+    return get_available_parquet_files(user=user)
+
+def get_user_mrna_files(user):
+    """Get mRNA files for a specific user"""
+    from .analysis.data_getters import get_available_mrna_parquet_files
+    return get_available_mrna_parquet_files(user=user)
+
+def require_login_and_files(view_func):
+    """Decorator that requires login and checks if user has uploaded files"""
+    @login_required
+    def wrapper(request, *args, **kwargs):
+        # Check if user has any parquet files
+        user_files = get_user_parquet_files(request.user)
+        if not user_files:
+            messages.warning(request, "Please upload parquet files first.")
+            return redirect('upload_parquet')
+        return view_func(request, *args, **kwargs)
+    return wrapper
 
 # ============================================================================
 # AUTHENTICATION VIEWS
@@ -562,19 +594,22 @@ def upload_parquet(request):
     })
 
 def clear_parquet_files(request):
-    """Clear all uploaded parquet files and related data"""
+    """Clear all uploaded parquet files and related data for the current user"""
+    if not request.user.is_authenticated:
+        return redirect('login')
+
     if request.method == "POST":
         try:
-            # Clear database records
-            deleted_parquet = UploadedParquet.objects.all().delete()
-            deleted_mrna = UploadedMrnaParquet.objects.all().delete()
-            print(f"Deleted {deleted_parquet[0]} parquet records and {deleted_mrna[0]} mRNA records")
+            # Clear database records for current user only
+            deleted_parquet = UploadedParquet.objects.filter(user=request.user).delete()
+            deleted_mrna = UploadedMrnaParquet.objects.filter(user=request.user).delete()
+            print(f"Deleted {deleted_parquet[0]} parquet records and {deleted_mrna[0]} mRNA records for user {request.user.username}")
 
-            # Clear file directories
-            parquet_dir = "media/parquetFiles/"
-            mrna_dir = "media/mrnaFiles/"
-            pickle_dir = "media/parquetPickles/"
-            mrna_pickle_dir = "media/mrnaPickles/"
+            # Clear user-specific file directories
+            parquet_dir = get_user_parquet_folder(request.user)
+            mrna_dir = get_user_mrna_folder(request.user)
+            pickle_dir = get_user_pickle_folder(request.user)
+            mrna_pickle_dir = get_user_mrna_pickle_folder(request.user)
 
             cleared_dirs = []
             # Remove and recreate directories to clear all files
