@@ -404,6 +404,10 @@ def _cache_file_in_background(file_path, file_type):
 
 # Upload and store all Parquet data
 def upload_parquet(request):
+    # Redirect to login if not authenticated
+    if not request.user.is_authenticated:
+        return redirect('login')
+
     bulk_ribo_form = BulkParquetUploadForm()
     bulk_mrna_form = BulkMrnaParquetUploadForm()
     psite_offset_form = PsiteOffsetUploadForm()
@@ -417,29 +421,31 @@ def upload_parquet(request):
                 successful_uploads = 0
                 failed_uploads = []
 
+                # Ensure user folders exist
+                ensure_user_folders(request.user)
+
                 for file in files:
                     if file.name.endswith('.parquet'):
                         try:
                             print(f"📥 Starting upload of {file.name} (size: {file.size} bytes)")
 
-                            # Create the parquet files directory if it doesn't exist
-                            parquet_dir = "parquetFiles"
-                            os.makedirs(f"media/{parquet_dir}", exist_ok=True)
+                            # Create user-specific parquet files directory
+                            user_parquet_dir = get_user_parquet_folder(request.user)
+                            os.makedirs(user_parquet_dir, exist_ok=True)
 
                             # Write file in chunks (1MB at a time)
-                            file_path = f"{parquet_dir}/{file.name}"
+                            file_path = os.path.join(user_parquet_dir, file.name)
                             chunk_size = 1024 * 1024  # 1MB chunks
 
-                            with default_storage.open(file_path, 'wb') as destination:
+                            with open(file_path, 'wb') as destination:
                                 for chunk in file.chunks(chunk_size=chunk_size):
                                     destination.write(chunk)
 
                             print(f"✅ File streamed to {file_path}")
 
-                            # Create database record
-                            uploaded_file = UploadedParquet(file=file_path)
+                            # Create database record with user
+                            uploaded_file = UploadedParquet(file=file_path, user=request.user)
                             uploaded_file.save()
-                            full_file_path = uploaded_file.file.path
                             print(f"✅ Database record created for {file.name}")
 
                             # Don't validate in background - just save and return
@@ -474,29 +480,31 @@ def upload_parquet(request):
                 successful_uploads = 0
                 failed_uploads = []
 
+                # Ensure user folders exist
+                ensure_user_folders(request.user)
+
                 for file in files:
                     if file.name.endswith('.parquet'):
                         try:
                             print(f"📥 Starting upload of {file.name} (size: {file.size} bytes)")
 
-                            # Create the mRNA files directory if it doesn't exist
-                            mrna_dir = "mrnaFiles"
-                            os.makedirs(f"media/{mrna_dir}", exist_ok=True)
+                            # Create user-specific mRNA files directory
+                            user_mrna_dir = get_user_mrna_folder(request.user)
+                            os.makedirs(user_mrna_dir, exist_ok=True)
 
                             # Write file in chunks (1MB at a time)
-                            file_path = f"{mrna_dir}/{file.name}"
+                            file_path = os.path.join(user_mrna_dir, file.name)
                             chunk_size = 1024 * 1024  # 1MB chunks
 
-                            with default_storage.open(file_path, 'wb') as destination:
+                            with open(file_path, 'wb') as destination:
                                 for chunk in file.chunks(chunk_size=chunk_size):
                                     destination.write(chunk)
 
                             print(f"✅ File streamed to {file_path}")
 
-                            # Create database record
-                            uploaded_file = UploadedMrnaParquet(file=file_path)
+                            # Create database record with user
+                            uploaded_file = UploadedMrnaParquet(file=file_path, user=request.user)
                             uploaded_file.save()
-                            full_file_path = uploaded_file.file.path
                             print(f"✅ Database record created for {file.name}")
 
                             # Don't validate in background - just save and return
