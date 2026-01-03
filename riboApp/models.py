@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 # Create your models here.
 # this is database you can create and add to with classes
@@ -31,6 +32,7 @@ class ProcessingInput(models.Model):
         return self.adapter
 
 class UploadedParquet(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)  # User who uploaded the file
     file = models.FileField(upload_to="parquetFiles/")  # Stores uploaded file location
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
@@ -38,6 +40,7 @@ class UploadedParquet(models.Model):
         return self.file.name
 
 class UploadedMrnaParquet(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)  # User who uploaded the file
     file = models.FileField(upload_to="mrnaFiles/")  # Stores uploaded mRNA file location
     uploaded_at = models.DateTimeField(auto_now_add=True)
 

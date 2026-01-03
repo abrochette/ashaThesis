@@ -161,3 +161,8 @@ CACHES = {
         'LOCATION': os.path.join(BASE_DIR, 'media', '.django_cache'),
     }
 }
+
+# Login settings
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'home'
+LOGOUT_REDIRECT_URL = 'home'

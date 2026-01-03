@@ -32,7 +32,53 @@ import pyarrow.parquet as pq
 from .models import SelectedGene, UploadedMrnaParquet, UploadedParquet
 import shutil
 from django.core.files.storage import default_storage
+from django.contrib.auth.models import User
+from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError
+from .user_utils import get_user_parquet_folder, get_user_mrna_folder, ensure_user_folders
 
+
+# ============================================================================
+# AUTHENTICATION VIEWS
+# ============================================================================
+
+def signup(request):
+    """User signup view"""
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        password_confirm = request.POST.get('password_confirm')
+        email = request.POST.get('email', '')
+
+        # Validate inputs
+        if not username or not password:
+            messages.error(request, "Username and password are required")
+            return render(request, 'riboApp/signup.html')
+
+        if password != password_confirm:
+            messages.error(request, "Passwords do not match")
+            return render(request, 'riboApp/signup.html')
+
+        if len(password) < 6:
+            messages.error(request, "Password must be at least 6 characters")
+            return render(request, 'riboApp/signup.html')
+
+        # Check if user already exists
+        if User.objects.filter(username=username).exists():
+            messages.error(request, "Username already exists")
+            return render(request, 'riboApp/signup.html')
+
+        # Create user
+        try:
+            user = User.objects.create_user(username=username, password=password, email=email)
+            ensure_user_folders(user)  # Create user-specific folders
+            messages.success(request, "Account created successfully! Please log in.")
+            return redirect('login')
+        except IntegrityError:
+            messages.error(request, "Error creating account. Please try again.")
+            return render(request, 'riboApp/signup.html')
+
+    return render(request, 'riboApp/signup.html')
 
 
 def reformatFilepaths(file_content):
